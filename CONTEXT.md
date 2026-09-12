@@ -24,8 +24,12 @@ repositories with unrelated histories before it was written here.
 ### The patch
 
 ```
-git -C <source> diff --binary --no-renames <C>^ <C> -- . ':(exclude,literal)<path>' …
+git -C <source> diff --binary --full-index --no-renames <base> <C> -- . ':(exclude,literal)<path>' …
 ```
+
+- **`<base>` is C's first parent**, or the empty tree for a root commit. For a merge that is
+  exactly what it brought in, so a merged branch crosses as one commit (see
+  [Which commits are listed](#which-commits-are-listed)).
 
 - **Exclusions are matched once, in Go**, against repo-relative paths. Git receives only
   literal exclude pathspecs for the paths that matched. One matcher means the file list, the
@@ -34,8 +38,13 @@ git -C <source> diff --binary --no-renames <C>^ <C> -- . ':(exclude,literal)<pat
 - **`--no-renames`** splits a rename into a delete and an add, so each side is matched
   against the exclusions on its own path. With renames on, a file moved out of an excluded
   path would carry across as a rename of something the target must never see.
-- A root commit is diffed against the empty tree, taken from `git hash-object -t tree
-  /dev/null` rather than a hardcoded id, so SHA-256 repositories work.
+- The empty tree's id is taken from `git hash-object -t tree /dev/null` rather than
+  hardcoded, so SHA-256 repositories work.
+- **User configuration is pinned out.** A `diff.noprefix`, `diff.external` or
+  `color.diff=always` would produce a patch apply cannot read, so the diff also runs with
+  `--no-color --no-ext-diff --no-textconv --no-relative --src-prefix=a/ --dst-prefix=b/`.
+  Apply runs with `--whitespace=nowarn --no-ignore-whitespace`, so `apply.whitespace=error`
+  cannot refuse a commit over a trailing space. Content crosses verbatim.
 - **Both repositories must use the same object format.** Blob ids are the whole mechanism; a
   SHA-1 source and a SHA-256 target share none. Floe refuses such a pair when it is opened.
 
@@ -50,13 +59,19 @@ markers.
 So before previewing or applying, floe copies every missing preimage blob into the target:
 
 ```
-git -C <target> cat-file -e <id>                                   # missing?
-git -C <source> cat-file blob <id> | git -C <target> hash-object -w --no-filters --stdin
+git -C <target> cat-file --batch-check                             # which are missing?
+git -C <source> cat-file blob <id>                                 # read whole, in Go …
+git -C <target> hash-object -w --no-filters --stdin                # … then written
 ```
 
-- `--no-filters` is required: without it the target's clean filters (`autocrlf`, LFS) would
-  rewrite the content and store it under a different id. Floe asserts the id `hash-object`
-  prints equals the one it asked for.
+- The ids are the old side of each crossing change in `git diff-tree --raw`. An added file
+  has none (the all-zeros id), and a submodule's old side is a commit in another repository,
+  not a blob. `--full-index` puts the same whole ids on the patch's `index` lines.
+- Each blob is read whole before it is written, never piped: in a shell pipe, a failed
+  `cat-file` still let `hash-object` store an empty blob.
+- Content from stdin is hashed without the target's clean filters (`autocrlf`, LFS) unless
+  `--path` is given; `--no-filters` pins that rather than relying on it. Floe asserts the id
+  `hash-object` prints equals the one it asked for.
 - The imported objects are unreachable: invisible to `git status` and history, and removed
   by git's garbage collection.
 
@@ -66,7 +81,7 @@ What a transfer will do is computed by running it against a **temporary index**,
 the target's real index nor its working tree is touched:
 
 ```
-GIT_INDEX_FILE=<tmp> git -C <target> read-tree HEAD
+GIT_INDEX_FILE=<tmp> git -C <target> read-tree HEAD                 # the empty tree, with no commits
 GIT_INDEX_FILE=<tmp> git -C <target> apply --cached --3way < patch
 GIT_INDEX_FILE=<tmp> git -C <target> ls-files -u                   # conflicting files
 ```
@@ -85,13 +100,17 @@ nothing to undo.
 2. **The content guard passes** — the pair's patterns are matched against every added line
    of the filtered patch and against the source commit's full message. Binary patches are
    base85-encoded and cannot be scanned line by line, so the preview names every binary file:
-   a visible gap rather than a silent one.
+   a visible gap rather than a silent one. Conflict markers are a second gap, still open: their
+   _theirs_ side can carry source lines the patch has only as context (see `ROADMAP.md`).
 3. **Preimage import, then preview** — the preview is what the user confirms.
 4. On confirm, the target is **re-checked**: still clean, and HEAD unchanged since the
    preview (a moved HEAD re-runs the preview rather than applying a stale one).
 5. **Apply** — `git -C <target> apply --index --3way < patch`. Exit 0 is clean; exit 1 with
    unmerged entries is a conflict; exit 1 without them is a failure, reported with git's
-   stderr.
+   stderr. A failure writes nothing: `git apply` is all or nothing, so one file it cannot
+   apply stops the files that would have merged too. `--3way` merges modifications only — a
+   source deletion of a file the target has changed fails rather than conflicts — while an
+   addition of a file the target already has is an add/add conflict.
 6. **Write the commit message** (below).
 
 ### The commit message
@@ -118,19 +137,34 @@ target was clean before the transfer — and it also discards any resolution edi
 so it asks for confirmation and says so. Discarding a clean staged transfer is the same
 operation.
 
+**A target with no commits is supported** — its first transfer is the one that gives it a
+history — but it has no HEAD to reset to. There, abort empties the index
+(`git read-tree --empty`) and deletes the files that were in it, which is what `reset --hard`
+does to a file staged but not in HEAD. None of them can have been untracked files: `git apply`
+refuses to overwrite one.
+
+## Which commits are listed
+
+**The source's first-parent history**, newest first (`git log --first-parent`). A merge is
+one entry, diffed against its first parent, so a merged branch crosses as one target commit;
+the commits on the merged branch are not listed and cannot be picked on their own. That keeps
+the history linear, which the position walk depends on.
+
 ## Where the target stands
 
 Computed on demand, never stored in either repository.
 
 - The target side is `git ls-tree -r -z HEAD` → path → (mode, blob id), exclusions removed.
-- The source side walks commits oldest-first through `git log --raw -z --no-renames`,
+- The source side walks the first-parent history oldest-first through
+  `git log --first-parent --diff-merges=first-parent --reverse --raw -z --no-renames`,
   keeping a running path → (mode, id) map and a running count of paths that differ from the
   target. Each commit updates only the paths it changed, so the cost is the total number of
   changes rather than commits × files.
 - Zero differences is a **match**; otherwise the smallest count is the **nearest**, and the
-  paths still differing there are shown as divergence.
-- The walk assumes a linear order, which ties it to the open question of which commits are
-  listed.
+  paths still differing there are shown as divergence. **Ties go to the newest commit**: a
+  history that returns to an earlier state (a revert) is placed at its latest point, where the
+  next transfer starts.
+- A target with no commits compares as an empty tree.
 
 ## Server
 
@@ -150,14 +184,14 @@ Computed on demand, never stored in either repository.
 | Area | Decision |
 |---|---|
 | Language | Go, one binary. Module `github.com/Sknoww/floe`, binary `floe`. The `go.mod` floor tracks the minimum the code needs, never bumped just because a newer toolchain is installed |
-| Layout | `main.go` at the root. `internal/git` shells out and parses; `internal/pair` owns pair config and remembered pairs; `internal/transfer` orders the checks, import, preview, apply and position computation; `internal/server` is HTTP, the token and the JSON API. `web/` is the frontend |
+| Layout | `main.go` at the root. `internal/git` shells out and parses; `internal/pair` owns pair config and remembered pairs; `internal/transfer` orders the checks, import, preview, apply and position computation; `internal/server` is HTTP, the token and the JSON API; `internal/gittest` makes the throwaway repositories the tests run against. `web/` is the frontend |
 | Frontend | **Svelte 5 + TypeScript, built with Vite.** Not SvelteKit: the Go server owns routing and the API, and the UI is one embedded page. Node is a build-time dependency only; binary size is not a constraint |
 | Styling | Plain CSS with custom properties, scoped per component; the values come from `DESIGN.md`. No component library — the mockups decide the look. Unstyled primitives are considered in area 2 if menus or dialogs need them |
 | Diff rendering | Our own component over git's unified output, so it follows `DESIGN.md`. Binary files render as a named placeholder. Syntax highlighting is deferred; Shiki is the candidate |
 | Embedding | `web/embed.go` embeds `all:dist`. `web/dist/` is build output, ignored except a placeholder so `go build` works before the first frontend build |
 | Dev loop | The Vite dev server proxies `/api` to `floe` running in a dev mode that accepts the Vite origin. A release binary never does |
-| Git access | Shell out via `os/exec`, as drift does; no git library. Every call takes a `context.Context`, reads `-z` output where git offers it, and runs with `LC_ALL=C`. Read-only calls set `GIT_OPTIONAL_LOCKS=0`, so floe's refreshes never contend with the editor's git for the index lock |
-| Testing | Real throwaway repositories, never mocks, and every pair has unrelated histories. Hermetic as drift's suite is: `TestMain` sets `GIT_CONFIG_NOSYSTEM=1`, and identity and initial branch are declared per repository. Frontend logic (diff parsing) is tested with Vitest |
+| Git access | Shell out via `os/exec`, as drift does; no git library. Every call takes a `context.Context`, reads `-z` output where git offers it, and runs with `LC_ALL=C`. Read-only calls set `GIT_OPTIONAL_LOCKS=0`, so floe's refreshes never contend with the editor's git for the index lock. **git 2.32.0 or newer**, checked when a pair is opened: the release in which `apply --3way` tries the merge first and accepts `--cached`, which the preview needs. Object ids reaching the git layer must be full hex ids, so none can be read as an option |
+| Testing | Real throwaway repositories, never mocks, and every pair has unrelated histories. Hermetic as drift's suite is: `TestMain` sets `GIT_CONFIG_NOSYSTEM=1` and `GIT_CONFIG_GLOBAL=/dev/null`, and identity and initial branch are declared per repository. Frontend logic (diff parsing) is tested with Vitest |
 | CI | Go tests plus the frontend build and tests on every push and pull request. Push, wait for green on the exact commit, then tag |
 | Distribution | GoReleaser on a tag: the frontend is built first (`npm ci && npm run build` in `web/`), then darwin/linux × amd64/arm64, a GitHub release, and a cask pushed to `Sknoww/homebrew-tap` with a `postflight` that strips quarantine. `main.version` is stamped via ldflags. The tap token is checked before anything is published |
 | Build target | macOS primary; Linux supported |

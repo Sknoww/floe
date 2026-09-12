@@ -1,0 +1,5 @@
+# Binary produced by `go build` in the repo root.
+/floe
+
+# GoReleaser build output.
+/dist

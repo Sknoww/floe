@@ -54,22 +54,31 @@ from every transfer.
 - Excluded files stay visible in a commit's file list, struck through. Individual files can be
   unticked for a single transfer.
 - On a conflict, floe stops with the markers in place and offers open-in-editor or abort.
+- **The commit list is the source's first-parent history.** A merge is one entry, diffed
+  against its first parent, so a merged branch crosses as one commit.
+- **A target with no commits is supported**: its first transfer is the one that gives it a
+  history.
+- **git 2.32.0 or newer**, checked when a pair is opened.
 
 ## Open questions
 
-- **Which commits are listed** (area 3) — first-parent history only, or every commit; and
-  what a merge commit's transfer is diffed against.
+- **The content guard and conflict markers** (area 6) — the guard scans added lines and the
+  message, but a conflict's _theirs_ side can carry source lines the patch has only as
+  context, and `merge.conflictStyle=diff3` adds the base lines too. Scan context lines, scan
+  the conflicted result, or accept the gap and name it in the preview.
 - **Open-in-editor** (area 2) — what it launches: `code`, `$VISUAL`, or a per-user setting.
 
 ## Areas
 
 1. ✅ **Plan** — `CONTEXT.md` (stack, conventions, config format). The questions still open
-   belong to areas 2 and 3.
+   belong to areas 2 and 6.
 2. ⏳ **Design** — mockups of setup, the commit list, a commit's files and diff, the transfer
    preview and the conflict state.
-3. ⏳ **Git layer** — shell-outs to `git`: commit list, per-commit files and diff, filtered
-   tree comparison, dirty check, transfer preview, preimage import, apply. Tested against
-   scratch repositories with unrelated histories.
+3. ✅ **Git layer** — `internal/git` shells out to `git`: commit list, per-commit files and
+   diff, trees and the history walk, dirty check, preimage import, preview, apply, reset and
+   `SQUASH_MSG`. `internal/transfer` orders them — refuse before writing — and computes the
+   position. Exclusions arrive as a predicate and guard patterns compiled; matching them and
+   the config file are area 6. Tested against scratch repositories with unrelated histories.
 4. ⏳ **Server** — loopback binding, token, `Host`/`Origin` checks, JSON API over the git layer.
 5. ⏳ **UI** — the screens from area 2.
 6. ⏳ **Exclusions and content guard** — editable from the UI, including "never transfer" on a
