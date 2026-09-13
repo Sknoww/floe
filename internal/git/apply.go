@@ -166,6 +166,12 @@ type ApplyResult struct {
 	Files []Change
 	// Conflicts lists the paths left with conflict markers.
 	Conflicts []string
+	// Landed is filled by Preview only: for each text file, the lines the
+	// result adds to the target's own version of it. That is every line the
+	// transfer brings in, including what a 3-way merge takes from the source
+	// beyond the patch's added lines — both sides of a conflict, and whatever a
+	// merge driver keeps.
+	Landed map[string][]string
 }
 
 // ApplyError is a patch git refused. Nothing was written: git apply is all or
@@ -188,8 +194,8 @@ func applyArgs(where string) []string {
 }
 
 // Preview applies patch to a temporary index built from head ("" for a
-// repository with no commits) and reports the result. Neither the real index
-// nor the working tree is touched.
+// repository with no commits) and reports the result, with the lines it brings
+// into each file. Neither the real index nor the working tree is touched.
 //
 // `git apply --check --3way` looks like the tool for this and is not: it never
 // attempts the 3-way merge, so it cannot tell a file that would conflict from
@@ -209,8 +215,18 @@ func (r *Repo) Preview(ctx context.Context, head string, patch []byte) (*ApplyRe
 	if _, err := r.run(ctx, call{args: []string{"read-tree", base}, env: env, write: true}); err != nil {
 		return nil, err
 	}
+	if err := r.refreshPaths(ctx, env, patch); err != nil {
+		return nil, err
+	}
 	_, applyErr := r.run(ctx, call{args: applyArgs("--cached"), stdin: patch, env: env, write: true})
-	return r.applied(ctx, base, env, applyErr)
+	res, err := r.applied(ctx, base, env, applyErr)
+	if err != nil {
+		return nil, err
+	}
+	if res.Landed, err = r.landed(ctx, env, dir, res.Files); err != nil {
+		return nil, err
+	}
+	return res, nil
 }
 
 // Apply applies patch to the real index and working tree with a 3-way merge. A

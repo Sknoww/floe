@@ -76,15 +76,16 @@ type call struct {
 	write bool     // the call writes; optional locks stay on
 }
 
+// run runs a git command and returns its stdout — also when git fails, for the
+// commands whose non-zero exit still comes with output that is wanted:
+// merge-file on a conflict, diff --no-index on files that differ.
 func (r *Repo) run(ctx context.Context, c call) ([]byte, error) {
 	var stdout bytes.Buffer
-	if err := r.stream(ctx, c, func(out io.Reader) error {
+	err := r.stream(ctx, c, func(out io.Reader) error {
 		_, err := io.Copy(&stdout, out)
 		return err
-	}); err != nil {
-		return nil, err
-	}
-	return stdout.Bytes(), nil
+	})
+	return stdout.Bytes(), err
 }
 
 // stream runs a git command and hands its stdout to read as it is produced, for

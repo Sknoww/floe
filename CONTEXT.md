@@ -82,6 +82,8 @@ the target's real index nor its working tree is touched:
 
 ```
 GIT_INDEX_FILE=<tmp> git -C <target> read-tree HEAD                 # the empty tree, with no commits
+git -C <target> apply --numstat -z --whitespace=nowarn < patch      # the paths the patch touches
+GIT_INDEX_FILE=<tmp> git -C <target> add --refresh --pathspec-from-file=- --pathspec-file-nul
 GIT_INDEX_FILE=<tmp> git -C <target> apply --cached --3way < patch
 GIT_INDEX_FILE=<tmp> git -C <target> ls-files -u                   # conflicting files
 ```
@@ -89,29 +91,50 @@ GIT_INDEX_FILE=<tmp> git -C <target> ls-files -u                   # conflicting
 `git apply --check --3way` looks like the obvious tool and is not: it never attempts the
 3-way merge, so it cannot tell a file that would conflict from one that would be rejected.
 
+- **The patch's paths are refreshed first.** `read-tree` leaves no stat data, so to git every
+  file on disk looks changed. Adding a file the target already has is an add/add merge, which
+  reads the target's file from disk — so without the refresh the preview refused as "does not
+  match index" a patch the real apply turns into a conflict. Only the patch's paths the index
+  already has are refreshed (`add --refresh` fails on any other), as literal pathspecs
+  (`GIT_LITERAL_PATHSPECS=1`): a whole-index refresh would hash every file in the target.
+  The target is clean, so what is on disk is HEAD.
+- **The preview reports what lands in each text file**: the lines the result adds to the
+  target's own version, from `git diff --no-index --unified=0` of the two. A clean file's
+  result is its blob in the temporary index. A conflict is rebuilt from stages 1–3 with
+  `git merge-file -p --diff3`, which matches what apply writes apart from the marker lines, so
+  both sides and the base count. Deletions and submodules bring in no lines, and binary files
+  (a NUL in the first 8000 bytes — git's own test) are left out: git merges none.
+
 ### Order: refuse before writing
 
-Every check that can refuse a transfer runs before anything is written, so a refusal has
-nothing to undo.
+Every check that can refuse a transfer runs before anything visible is written — at most
+unreachable objects — so a refusal has nothing to undo.
 
 1. **The target is clean** — `git status --porcelain`, untracked files not counted. They
    cannot mix into a commit, and a patch that would overwrite one is refused by `git apply`
    itself.
-2. **The content guard passes** — the pair's patterns are matched against every added line
-   of the filtered patch and against the source commit's full message. Binary patches are
-   base85-encoded and cannot be scanned line by line, so the preview names every binary file:
-   a visible gap rather than a silent one. Conflict markers are a second gap, still open: their
-   _theirs_ side can carry source lines the patch has only as context (see `ROADMAP.md`).
+2. **The content guard passes on the patch** — the pair's patterns are matched against every
+   added line of the filtered patch and against the source commit's full message, before the
+   import writes anything. Binary patches are base85-encoded and cannot be scanned line by
+   line, so the preview names every binary file: a visible gap rather than a silent one.
 3. **Preimage import, then preview** — the preview is what the user confirms.
-4. On confirm, the target is **re-checked**: still clean, and HEAD unchanged since the
+4. **The content guard passes on what lands.** A 3-way merge brings in source lines the patch
+   has only as context, or not at all. A conflict spans the target's whole edit, so its
+   _theirs_ side — and the base, under `merge.conflictStyle=diff3` — can carry source lines far
+   outside the hunk; a merge driver such as `merge=union` merges cleanly and keeps them. So the
+   guard is also matched against the preview's landed lines, and such a match is reported as
+   brought in by the merge. A line the target already has never matches here: only what the
+   result adds is scanned. Known limit: a conflicted file under a custom `merge.<name>.driver`
+   is rebuilt with git's stock merge, not the driver.
+5. On confirm, the target is **re-checked**: still clean, and HEAD unchanged since the
    preview (a moved HEAD re-runs the preview rather than applying a stale one).
-5. **Apply** — `git -C <target> apply --index --3way < patch`. Exit 0 is clean; exit 1 with
+6. **Apply** — `git -C <target> apply --index --3way < patch`. Exit 0 is clean; exit 1 with
    unmerged entries is a conflict; exit 1 without them is a failure, reported with git's
    stderr. A failure writes nothing: `git apply` is all or nothing, so one file it cannot
    apply stops the files that would have merged too. `--3way` merges modifications only — a
    source deletion of a file the target has changed fails rather than conflicts — while an
    addition of a file the target already has is an add/add conflict.
-6. **Write the commit message** (below).
+7. **Write the commit message** (below).
 
 ### The commit message
 
@@ -219,9 +242,14 @@ Computed on demand, never stored in either repository.
 ```
 
 - `exclude` — glob patterns on repo-relative paths, `**` crossing directories (doublestar,
-  as drift uses).
+  as drift uses). A pattern matches the **whole path from the top level**: `README.md` is only
+  the top-level README, `docs` is a file named docs, and `docs/**` is everything under the
+  docs directory. A pattern that can never match a path git reports — empty, a leading or
+  trailing `/`, an empty segment, a `.` or `..` segment — is an error that suggests the
+  pattern meant (`README.md`, `docs/**`).
 - `guard` — Go (RE2) regular expressions, case-sensitive unless `(?i)`. The UI can offer
-  "match literally" by escaping what the user types.
+  "match literally" by escaping what the user types. An empty pattern would refuse every
+  transfer and is an error.
 - Floe writes the file (edits from the UI, `lastOpened`) atomically, via a temp file and
   rename. Hand edits are fine. An unknown field or an invalid pattern is an **error naming
   the file and the field**, never ignored: a setting that silently didn't apply is

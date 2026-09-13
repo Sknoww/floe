@@ -330,6 +330,49 @@ func TestContentGuard(t *testing.T) {
 	}
 }
 
+func TestContentGuardScansWhatAMergeBringsIn(t *testing.T) {
+	ctx := t.Context()
+	guard := []*regexp.Regexp{regexp.MustCompile(`(?i)acme corp`)}
+
+	// The source changes line 8. The patch's context is lines 5 to 11, so the
+	// guard-matching line 3 is not in it — but the target rewrote lines 3 to
+	// 9, and the conflict's source side carries line 3 across.
+	src := gittest.Init(t)
+	gittest.Write(t, src, "f.txt", "l1\nl2\nACME Corp internal\nl4\nl5\nl6\nl7\nl8\nl9\nl10\nl11\nl12\n")
+	gittest.Write(t, src, "own.txt", "Acme Corp mirror\nx\n")
+	gittest.Commit(t, src, "Base")
+	gittest.Write(t, src, "f.txt", "l1\nl2\nACME Corp internal\nl4\nl5\nl6\nl7\nSRC\nl9\nl10\nl11\nl12\n")
+	conflicting := gittest.Commit(t, src, "Change line 8")
+	gittest.Write(t, src, "own.txt", "Acme Corp mirror\ny\n")
+	beside := gittest.Commit(t, src, "Change beside a line the target has too")
+
+	tgt := gittest.Init(t)
+	gittest.Write(t, tgt, "f.txt", "l1\nl2\nscrubbed\nT4\nT5\nT6\nT7\nT8\nT9\nl10\nl11\nl12\n")
+	gittest.Write(t, tgt, "own.txt", "Acme Corp mirror\nx\n")
+	gittest.Commit(t, tgt, "Target")
+	p := openPair(t, src, tgt)
+
+	var ge *GuardError
+	if _, err := p.Preview(ctx, Request{Commit: conflicting, Guard: guard}); !errors.As(err, &ge) {
+		t.Fatalf("Preview = %v, want *GuardError", err)
+	}
+	want := GuardMatch{Pattern: "(?i)acme corp", Path: "f.txt", Line: "ACME Corp internal", Merged: true}
+	for _, m := range ge.Matches {
+		if m != want {
+			t.Errorf("match %+v, want %+v", m, want)
+		}
+	}
+	if status := gittest.Git(t, tgt, "status", "--porcelain"); status != "" {
+		t.Errorf("a refusal touched the target: %q", status)
+	}
+
+	// A match the target already has — here, as the patch's context — is not
+	// something the transfer brings in.
+	if _, err := p.Preview(ctx, Request{Commit: beside, Guard: guard}); err != nil {
+		t.Errorf("Preview beside the target's own match = %v", err)
+	}
+}
+
 func TestApplyChecksTheTargetAgain(t *testing.T) {
 	ctx := t.Context()
 	src, tgt, commit := basePair(t)

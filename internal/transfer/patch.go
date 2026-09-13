@@ -2,7 +2,9 @@ package transfer
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -102,12 +104,15 @@ func closingQuote(s string) int {
 // GuardMatch is one place a content guard pattern matched.
 type GuardMatch struct {
 	Pattern string
-	Path    string // the file whose added line matched; "" for the commit message
+	Path    string // the file whose line matched; "" for the commit message
 	Line    string // the line that matched, without the patch's leading "+"
+	// Merged marks a line the 3-way merge brought in beyond the patch's added
+	// lines: a side of a conflict, or what a merge driver kept.
+	Merged bool
 }
 
-// GuardError refuses a transfer whose patch or message matches the pair's
-// content guard. Nothing has been written.
+// GuardError refuses a transfer whose patch, message or merge result matches
+// the pair's content guard. Nothing visible has been written.
 type GuardError struct {
 	Matches []GuardMatch
 }
@@ -117,6 +122,9 @@ func (e *GuardError) Error() string {
 	where := "the commit message"
 	if m.Path != "" {
 		where = m.Path
+	}
+	if m.Merged {
+		where += ", brought in by the 3-way merge"
 	}
 	return fmt.Sprintf("the content guard refused the transfer: %q matched in %s (%d match(es) in all)", m.Pattern, where, len(e.Matches))
 }
@@ -129,11 +137,7 @@ func guardMatches(guard []*regexp.Regexp, files []filePatch, message string) []G
 	var matches []GuardMatch
 	for _, re := range guard {
 		for _, f := range files {
-			for _, line := range f.Added {
-				if re.MatchString(line) {
-					matches = append(matches, GuardMatch{Pattern: re.String(), Path: f.Path, Line: line})
-				}
-			}
+			matches = append(matches, lineMatches(re, f.Path, f.Added, false)...)
 		}
 		for _, loc := range re.FindAllStringIndex(message, -1) {
 			start := strings.LastIndex(message[:loc[0]], "\n") + 1
@@ -142,6 +146,31 @@ func guardMatches(guard []*regexp.Regexp, files []filePatch, message string) []G
 				end = len(message) - start
 			}
 			matches = append(matches, GuardMatch{Pattern: re.String(), Line: message[start : start+end]})
+		}
+	}
+	return matches
+}
+
+// landedMatches matches the guard against the lines a preview's result brings
+// into each file (git.ApplyResult.Landed), in path order. The patch's added
+// lines are among them and have already passed, so every match is a line the
+// merge brought in.
+func landedMatches(guard []*regexp.Regexp, landed map[string][]string) []GuardMatch {
+	paths := slices.Sorted(maps.Keys(landed))
+	var matches []GuardMatch
+	for _, re := range guard {
+		for _, path := range paths {
+			matches = append(matches, lineMatches(re, path, landed[path], true)...)
+		}
+	}
+	return matches
+}
+
+func lineMatches(re *regexp.Regexp, path string, lines []string, merged bool) []GuardMatch {
+	var matches []GuardMatch
+	for _, line := range lines {
+		if re.MatchString(line) {
+			matches = append(matches, GuardMatch{Pattern: re.String(), Path: path, Line: line, Merged: merged})
 		}
 	}
 	return matches

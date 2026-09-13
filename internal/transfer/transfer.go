@@ -128,9 +128,10 @@ var (
 // Preview runs every check that can refuse the transfer, and only then writes:
 //
 //  1. The target is clean.
-//  2. The content guard passes.
+//  2. The content guard passes on the patch's added lines and the message.
 //  3. The preimage blobs are imported, and the result is computed on a
 //     temporary index.
+//  4. The content guard passes on what the result brings into each file.
 //
 // A patch git would refuse comes back as a *git.ApplyError.
 func (p *Pair) Preview(ctx context.Context, req Request) (*Preview, error) {
@@ -192,6 +193,13 @@ func (p *Pair) Preview(ctx context.Context, req Request) (*Preview, error) {
 	if err != nil {
 		return nil, err
 	}
+	// A 3-way merge can bring in source lines the patch has only as context,
+	// or not at all: both sides of a conflict, the diff3 base, whatever a merge
+	// driver keeps. So what lands is scanned too. Only unreachable objects have
+	// been written, so a refusal still has nothing visible to undo.
+	if matches := landedMatches(req.Guard, result.Landed); len(matches) > 0 {
+		return nil, &GuardError{Matches: matches}
+	}
 	return &Preview{
 		Commit:     req.Commit,
 		TargetHead: head,
@@ -205,10 +213,10 @@ func (p *Pair) Preview(ctx context.Context, req Request) (*Preview, error) {
 
 // Apply carries out a preview:
 //
-//  4. The target is checked again: still clean, and HEAD where the preview saw
+//  5. The target is checked again: still clean, and HEAD where the preview saw
 //     it.
-//  5. The patch is applied to the index and working tree with a 3-way merge.
-//  6. The source commit's message is written to SQUASH_MSG for the commit the
+//  6. The patch is applied to the index and working tree with a 3-way merge.
+//  7. The source commit's message is written to SQUASH_MSG for the commit the
 //     user writes — after a conflict too, since the message outlives resolving
 //     it.
 //

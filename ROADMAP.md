@@ -49,8 +49,11 @@ from every transfer.
   written into either repository.
 - **Configuration lives outside both repositories**, per source/target pair, in the user's
   config directory: exclusions and content-guard patterns.
-- **Content guard.** A transfer is refused when the patch's added lines or the source commit's
-  message match the pair's patterns.
+- **Content guard.** A transfer is refused when the patch's added lines, the source commit's
+  message, or any line the 3-way merge brings into a file match the pair's patterns — a
+  conflict's source side, or a merge driver, can carry lines the patch has only as context.
+- **Exclusions are anchored doublestar globs** on whole repo-relative paths. A pattern that
+  can never match a file, such as `/README.md` or `docs/`, is an error, not a silent no-op.
 - Excluded files stay visible in a commit's file list, struck through. Individual files can be
   unticked for a single transfer.
 - On a conflict, floe stops with the markers in place and offers open-in-editor or abort.
@@ -62,16 +65,12 @@ from every transfer.
 
 ## Open questions
 
-- **The content guard and conflict markers** (area 6) — the guard scans added lines and the
-  message, but a conflict's _theirs_ side can carry source lines the patch has only as
-  context, and `merge.conflictStyle=diff3` adds the base lines too. Scan context lines, scan
-  the conflicted result, or accept the gap and name it in the preview.
 - **Open-in-editor** (area 2) — what it launches: `code`, `$VISUAL`, or a per-user setting.
 
 ## Areas
 
-1. ✅ **Plan** — `CONTEXT.md` (stack, conventions, config format). The questions still open
-   belong to areas 2 and 6.
+1. ✅ **Plan** — `CONTEXT.md` (stack, conventions, config format). The question still open
+   belongs to area 2.
 2. ⏳ **Design** — mockups of setup, the commit list, a commit's files and diff, the transfer
    preview and the conflict state.
 3. ✅ **Git layer** — `internal/git` shells out to `git`: commit list, per-commit files and
@@ -81,8 +80,10 @@ from every transfer.
    the config file are area 6. Tested against scratch repositories with unrelated histories.
 4. ⏳ **Server** — loopback binding, token, `Host`/`Origin` checks, JSON API over the git layer.
 5. ⏳ **UI** — the screens from area 2.
-6. ⏳ **Exclusions and content guard** — editable from the UI, including "never transfer" on a
-   file row.
+6. 🛠️ **Exclusions and content guard** — `internal/pair` reads and writes each pair's config
+   and lists the remembered pairs; exclusions are matched and guard patterns compiled there.
+   The guard also scans what a 3-way merge brings in. Still to come: editing both from the UI,
+   including "never transfer" on a file row, once areas 4 and 5 exist.
 7. ⏳ **Release** — GoReleaser, the cask, `README.md`.
 8. ⏸️ **Whole-tree comparison** — source HEAD against the target, beyond the per-commit
    nearest match.
