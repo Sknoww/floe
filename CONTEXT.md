@@ -1,7 +1,7 @@
 # Floe — Project Context
 
 > The single source of truth for **architectural and product decisions**. Visual and
-> interaction decisions will live in [`DESIGN.md`](./DESIGN.md). Update this document when a
+> interaction decisions live in [`DESIGN.md`](./DESIGN.md). Update this document when a
 > decision is made — it describes what _is_, not how it got here (that's git). What is next
 > lives in [`ROADMAP.md`](./ROADMAP.md).
 
@@ -153,7 +153,15 @@ box from it (`getInputTemplate` in `extensions/git/src/repository.ts`, which pre
 ### Conflict and abort
 
 A conflict stops with markers in the working tree and unmerged entries in the index. Floe
-offers open-in-editor (what it launches is an open question) or abort.
+offers open-in-editor or abort, which the UI calls **Discard transfer**.
+
+**Open in editor** launches VS Code on the target repository, at the conflicted file: VS
+Code's commit box picks up the carried `SQUASH_MSG` and it has conflict tooling. Where VS
+Code is not installed, the file opens in the system's default text editor. On macOS the
+`code` command is often not on `PATH` even with VS Code installed, so floe must find the
+application itself rather than rely on it. `$VISUAL` is not used: floe is driven from a
+browser, and a terminal editor has no terminal to open in. The exact launch commands are
+probed and written here when area 5 builds it.
 
 **Abort** is `git reset --hard HEAD` plus removing `SQUASH_MSG`. It is safe only because the
 target was clean before the transfer — and it also discards any resolution edits made since,
@@ -209,7 +217,7 @@ Computed on demand, never stored in either repository.
 | Language | Go, one binary. Module `github.com/Sknoww/floe`, binary `floe`. The `go.mod` floor tracks the minimum the code needs, never bumped just because a newer toolchain is installed |
 | Layout | `main.go` at the root. `internal/git` shells out and parses; `internal/pair` owns pair config and remembered pairs; `internal/transfer` orders the checks, import, preview, apply and position computation; `internal/server` is HTTP, the token and the JSON API; `internal/gittest` makes the throwaway repositories the tests run against. `web/` is the frontend |
 | Frontend | **Svelte 5 + TypeScript, built with Vite.** Not SvelteKit: the Go server owns routing and the API, and the UI is one embedded page. Node is a build-time dependency only; binary size is not a constraint |
-| Styling | Plain CSS with custom properties, scoped per component; the values come from `DESIGN.md`. No component library — the mockups decide the look. Unstyled primitives are considered in area 2 if menus or dialogs need them |
+| Styling | Plain CSS with custom properties, scoped per component; the values come from `DESIGN.md`. No component library — the mockups decide the look. The design needs one dialog (the discard confirmation) and one menu (the pair switcher); unstyled primitives are considered in area 5 for them |
 | Diff rendering | Our own component over git's unified output, so it follows `DESIGN.md`. Binary files render as a named placeholder. Syntax highlighting is deferred; Shiki is the candidate |
 | Embedding | `web/embed.go` embeds `all:dist`. `web/dist/` is build output, ignored except a placeholder so `go build` works before the first frontend build |
 | Dev loop | The Vite dev server proxies `/api` to `floe` running in a dev mode that accepts the Vite origin. A release binary never does |

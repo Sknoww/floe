@@ -3,3 +3,6 @@
 
 # GoReleaser build output.
 /dist
+
+# The assembled design canvas, rebuilt from the .dc.html sources beside it.
+/design/mockups/floe-mockups.html

@@ -1,0 +1,83 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap">
+  <style>
+    body { margin: 0; background: #15171b; }
+    a { color: #6fc2b4; } a:hover { color: #9adbd0; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
+    .eyebrow { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #6c737e; }
+    .section { border: 1px solid #262a31; border-radius: 6px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+    .pat { display: flex; align-items: center; gap: 12px; height: 34px; padding: 0 12px; border-radius: 4px; background: #1a1d22; }
+    .pat > span:first-child { flex: 1 1 auto; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; color: #eef0f3; }
+    .btn { height: 36px; padding: 0 18px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-weight: 600; box-sizing: border-box; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; background: #15171b; color: #d4d7dd; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column;">
+
+  <div style="height: 48px; flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: 0 18px; border-bottom: 1px solid #262a31; background: #121418;">
+    <span class="mono" style="font-weight: 700; font-size: 15px; color: #eef0f3;">floe</span>
+    <span style="color: #3a3f47;">/</span>
+    <span style="display: flex; align-items: center; gap: 8px; color: #eef0f3; font-weight: 500;">app-internal <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#6c737e" stroke-width="1.5"><path d="M3 8h10M9 4l4 4-4 4"></path></svg> app-public</span>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#6c737e" stroke-width="1.5"><path d="M3.5 5.5L7 9l3.5-3.5"></path></svg>
+  </div>
+
+  <div style="width: 820px; align-self: center; padding-top: 32px; display: flex; flex-direction: column; gap: 20px;">
+    <span style="display: flex; align-items: center; gap: 6px; color: #7b828c;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#7b828c" stroke-width="1.5"><path d="M11 7H3M6 4L3 7l3 3"></path></svg>Back to transfers</span>
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <span style="font-size: 22px; font-weight: 600; color: #eef0f3;">Pair settings</span>
+      <span class="mono" style="font-size: 11px; color: #6c737e;">~/.config/floe/pairs/app-internal--app-public-3b9f0c2e.json</span>
+    </div>
+
+    <div class="section">
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <span class="eyebrow">Never crosses</span>
+        <span style="color: #9aa1ab; line-height: 19px;">Paths matching these are left out of every transfer. Each pattern matches the whole path from the repository's top level, and <span class="mono" style="font-size: 12px;">**</span> crosses directories.</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div class="pat"><span>README.md</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#6c737e" stroke-width="1.5"><path d="M4 4l6 6M10 4l-6 6"></path></svg></div>
+        <div class="pat"><span>.github/**</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#6c737e" stroke-width="1.5"><path d="M4 4l6 6M10 4l-6 6"></path></svg></div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: flex; gap: 10px;">
+          <div class="mono" style="flex-grow: 1; height: 34px; box-sizing: border-box; border: 1px solid rgba(224, 130, 111, 0.6); border-radius: 4px; padding: 0 12px; display: flex; align-items: center; font-size: 12px; color: #eef0f3; background: #121418;">docs/</div>
+          <div class="btn" style="height: 34px; border: 1px solid #2f343c; color: #6c737e;">Add</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span style="color: #e0826f; flex-grow: 1;"><span class="mono" style="font-size: 12px;">"docs/"</span> can never match a file: to exclude everything under a directory, write <span class="mono" style="font-size: 12px;">"docs/**"</span></span>
+          <span class="mono" style="font-size: 12px; color: #6fc2b4; flex-shrink: 0;">Use docs/**</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <span class="eyebrow">Content guard</span>
+        <span style="color: #9aa1ab; line-height: 19px;">A transfer is refused when an added line, the commit message, or a line the merge brings in matches one of these. Go regular expressions, case-sensitive unless they start with <span class="mono" style="font-size: 12px;">(?i)</span>.</span>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 6px;">
+        <div class="pat"><span>(?i)acme corp</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#6c737e" stroke-width="1.5"><path d="M4 4l6 6M10 4l-6 6"></path></svg></div>
+        <div class="pat"><span>internal\.example\.com</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#6c737e" stroke-width="1.5"><path d="M4 4l6 6M10 4l-6 6"></path></svg></div>
+        <div class="pat"><span>(?i)do not ship</span><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#6c737e" stroke-width="1.5"><path d="M4 4l6 6M10 4l-6 6"></path></svg></div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="flex-grow: 1; height: 34px; box-sizing: border-box; border: 1px solid #2f343c; border-radius: 4px; padding: 0 12px; display: flex; align-items: center; color: #5c626b; background: #121418;">Add a pattern</div>
+        <span style="display: flex; align-items: center; gap: 7px; color: #9aa1ab; flex-shrink: 0;"><svg width="14" height="14" viewBox="0 0 14 14"><rect x="0.75" y="0.75" width="12.5" height="12.5" rx="2" fill="none" stroke="#4a5059"></rect></svg>Match literally</span>
+        <div class="btn" style="height: 34px; border: 1px solid #2f343c; color: #6c737e;">Add</div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 10px;">
+      <div class="btn" style="background: #6fc2b4; color: #0f1a18;">Save</div>
+      <div class="btn" style="border: 1px solid #2f343c; color: #d4d7dd;">Discard changes</div>    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=Public+Sans:wght@400;500;600&amp;display=swap">
+  <style>
+    body { margin: 0; background: #f5f3ee; }
+    a { color: #a4502a; } a:hover { color: #7f3c1e; }
+    .serif { font-family: 'Newsreader', Georgia, serif; }
+    .mono { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+    .row { display: grid; grid-template-columns: 28px 76px minmax(0, 1fr) 60px; align-items: center; height: 46px; }
+    .dot { width: 9px; height: 9px; border-radius: 5px; justify-self: center; box-sizing: border-box; }
+    .dl { display: grid; grid-template-columns: 36px 36px 1fr; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 20px; white-space: pre; padding: 0 12px; }
+    .dl span:nth-child(-n+2) { color: #b0aa9f; text-align: right; padding-right: 12px; }
+    .add { background: #e4eddc; color: #2f5a2a; }
+    .del { background: #f3e0d8; color: #7a3a26; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; background: #f5f3ee; color: #26231f; font-family: 'Public Sans', system-ui, sans-serif; font-size: 14px; display: flex; flex-direction: column; align-items: center; overflow: hidden; position: relative;">
+
+  <div style="width: 960px; display: flex; align-items: flex-end; gap: 24px; padding: 36px 0 22px; border-bottom: 1px solid #ddd8ce;">
+    <div style="display: flex; flex-direction: column; gap: 6px; flex-grow: 1;">
+      <div class="mono" style="font-size: 12px; color: #8c867b; letter-spacing: 0.04em;">floe</div>
+      <div class="serif" style="font-size: 34px; line-height: 40px;">app-internal <svg width="26" height="26" viewBox="0 0 16 16" fill="none" stroke="#a4502a" stroke-width="1.2" style="vertical-align: -3px; margin: 0 4px;"><path d="M3 8h10M9 4l4 4-4 4"></path></svg> app-public</div>
+    </div>
+    <div style="display: flex; gap: 20px; color: #6f6a61; padding-bottom: 6px;">
+      <span>Target clean · matches <span class="mono" style="font-size: 12px;">3f2a91c</span></span>
+      <span>2 exclusions</span>
+      <span>3 guard patterns</span>
+    </div>
+  </div>
+
+  <div style="width: 960px; display: flex; flex-direction: column; padding-top: 6px;">
+    <div style="position: relative;">
+      <div style="position: absolute; left: 13px; top: 0; bottom: 0; width: 1px; background: #d6d0c4;"></div>
+
+      <div class="row" style="color: #4a463f;">
+        <div class="dot" style="border: 1.5px solid #9a9488; background: #f5f3ee;"></div>
+        <span class="mono" style="font-size: 12px; color: #8c867b;">9c41e07</span>
+        <span>Retry webhook deliveries with backoff</span>
+        <span style="color: #8c867b; text-align: right;">2h</span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 28px minmax(0, 1fr); padding: 6px 0 18px;">
+        <div class="dot" style="border: 2px solid #a4502a; background: #f5f3ee; margin-top: 16px;"></div>
+        <div style="background: #fffdf8; border: 1px solid #e2ddd2; border-radius: 3px; padding: 18px 22px; display: flex; flex-direction: column; gap: 14px;">
+          <div style="display: flex; align-items: baseline; gap: 14px;">
+            <span class="serif" style="font-size: 24px; flex-grow: 1;">Move rate limits into config</span>
+            <span class="mono" style="font-size: 12px; color: #8c867b;">5b2d8f3 · Hunter · 1d</span>
+          </div>
+          <div style="color: #5a554c; line-height: 21px; max-width: 640px;">Limits were constants in two places. Read them from config/limits.yaml so staging can run looser.</div>
+          <div style="display: flex; flex-direction: column; border-top: 1px solid #ece7dd;">
+            <div style="display: flex; align-items: center; gap: 12px; height: 32px; border-bottom: 1px solid #ece7dd;">
+              <span style="width: 12px; height: 12px; border: 1.5px solid #a4502a; background: #a4502a; border-radius: 2px;"></span>
+              <span class="mono" style="font-size: 12px; flex-grow: 1;">internal/limits/limits.go</span>
+              <span class="mono" style="font-size: 12px; color: #8c867b;">modified</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; height: 32px; border-bottom: 1px solid #ece7dd;">
+              <span style="width: 12px; height: 12px; border: 1.5px solid #a4502a; background: #a4502a; border-radius: 2px;"></span>
+              <span class="mono" style="font-size: 12px; flex-grow: 1;">config/limits.yaml</span>
+              <span class="mono" style="font-size: 12px; color: #8c867b;">added</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; height: 32px; border-bottom: 1px solid #ece7dd;">
+              <span style="width: 12px; height: 12px; border: 1.5px solid #a4502a; background: #a4502a; border-radius: 2px;"></span>
+              <span class="mono" style="font-size: 12px; flex-grow: 1;">cmd/server/main.go</span>
+              <span class="mono" style="font-size: 12px; color: #8c867b;">modified</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; height: 32px; border-bottom: 1px solid #ece7dd; color: #a39d92;">
+              <span style="width: 12px; height: 12px; border: 1.5px solid #cfc9bd; border-radius: 2px;"></span>
+              <span class="mono" style="font-size: 12px; flex-grow: 1; text-decoration: line-through;">README.md</span>
+              <span style="font-size: 12px; font-style: italic;">never crosses</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px; height: 32px; color: #a39d92;">
+              <span style="width: 12px; height: 12px; border: 1.5px solid #cfc9bd; border-radius: 2px;"></span>
+              <span class="mono" style="font-size: 12px; flex-grow: 1; text-decoration: line-through;">.github/workflows/ci.yml</span>
+              <span style="font-size: 12px; font-style: italic;">never crosses</span>
+            </div>
+          </div>
+          <div style="border: 1px solid #ece7dd; border-radius: 2px; padding: 8px 0;">
+            <div class="dl" style="color: #8c867b;"><span></span><span></span><span>internal/limits/limits.go   +4 −5</span></div>
+            <div class="dl" style="color: #8c867b;"><span></span><span></span><span>@@ -16,5 +17,3 @@ package limits</span></div>
+            <div class="dl del"><span>16</span><span></span><span>-const (</span></div>
+            <div class="dl del"><span>17</span><span></span><span>-    perMinute = 120</span></div>
+            <div class="dl del"><span>18</span><span></span><span>-    burst     = 40</span></div>
+            <div class="dl del"><span>19</span><span></span><span>-)</span></div>
+            <div class="dl del"><span>20</span><span></span><span>-</span></div>
+            <div class="dl add"><span></span><span>17</span><span>+func Load(cfg *config.Config) Limits {</span></div>
+            <div class="dl add"><span></span><span>18</span><span>+    return Limits{PerMinute: cfg.Limits.PerMinute, Burst: cfg.Limits.Burst}</span></div>
+            <div class="dl add"><span></span><span>19</span><span>+}</span></div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 16px;">
+            <span style="padding: 9px 18px; background: #26231f; color: #f5f3ee; border-radius: 3px; font-weight: 500;">Preview transfer</span>
+            <span style="color: #8c867b;">3 of 5 files cross. Lands staged; you write the commit.</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 12px; height: 30px;">
+        <div style="width: 28px; display: flex; justify-content: center;"><div style="width: 15px; height: 2px; background: #a4502a;"></div></div>
+        <span class="serif" style="font-size: 16px; font-style: italic; color: #a4502a;">app-public is here</span>
+        <div style="flex-grow: 1; height: 1px; background: #d9a88f;"></div>
+      </div>
+
+      <div class="row">
+        <div class="dot" style="background: #a4502a;"></div>
+        <span class="mono" style="font-size: 12px; color: #8c867b;">3f2a91c</span>
+        <span>Merge branch 'invoice-export'</span>
+        <span style="color: #8c867b; text-align: right;">3d</span>
+      </div>
+      <div class="row" style="color: #9a9488;">
+        <div class="dot" style="background: #cfc9bd;"></div>
+        <span class="mono" style="font-size: 12px;">a7d0b54</span>
+        <span>Fix timezone in daily digest</span>
+        <span style="text-align: right;">4d</span>
+      </div>
+      <div class="row" style="color: #9a9488;">
+        <div class="dot" style="background: #cfc9bd;"></div>
+        <span class="mono" style="font-size: 12px;">0c9e112</span>
+        <span>Bump Go to 1.24</span>
+        <span style="text-align: right;">6d</span>
+      </div>
+      <div class="row" style="color: #9a9488;">
+        <div class="dot" style="background: #cfc9bd;"></div>
+        <span class="mono" style="font-size: 12px;">71be4d9</span>
+        <span>Add health endpoint</span>
+        <span style="text-align: right;">9d</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 70px; background: linear-gradient(rgba(245, 243, 238, 0), #f5f3ee);"></div>
+</div>
+</x-dc>
+</body>
+</html>

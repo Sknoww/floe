@@ -22,8 +22,9 @@ from every transfer.
 - **The UI is Svelte 5 + TypeScript, built with Vite** and embedded in the binary. Node is a
   build-time dependency only; binary size is not a constraint. Diffs are rendered by our own
   component, not a library, so they follow `DESIGN.md`.
-- **The UI has to look good.** Mockups are approved before frontend code, and `DESIGN.md`
-  records the rules once they're made.
+- **The UI has to look good.** Mockups are approved before frontend code, and
+  [`DESIGN.md`](./DESIGN.md) records the rules. The UI is **dark only**, laid out source →
+  crossing commit → target.
 - **Public**, shipped as a Homebrew cask in `Sknoww/homebrew-tap` through GoReleaser, the same
   path as drift. Nothing about any particular pair of repositories is compiled in.
 - **Launch:** `floe <source> <target>` opens a pair and remembers it; bare `floe` lists the
@@ -56,7 +57,10 @@ from every transfer.
   can never match a file, such as `/README.md` or `docs/`, is an error, not a silent no-op.
 - Excluded files stay visible in a commit's file list, struck through. Individual files can be
   unticked for a single transfer.
-- On a conflict, floe stops with the markers in place and offers open-in-editor or abort.
+- On a conflict, floe stops with the markers in place and offers open-in-editor or discard.
+- **Open in editor launches VS Code** on the target, at the conflicted file, or the system's
+  default text editor where VS Code is not installed. Not `$VISUAL`: a terminal editor
+  cannot be opened from a click in the browser.
 - **The commit list is the source's first-parent history.** A merge is one entry, diffed
   against its first parent, so a merged branch crosses as one commit.
 - **A target with no commits is supported**: its first transfer is the one that gives it a
@@ -65,20 +69,21 @@ from every transfer.
 
 ## Open questions
 
-- **Open-in-editor** (area 2) — what it launches: `code`, `$VISUAL`, or a per-user setting.
+None.
 
 ## Areas
 
-1. ✅ **Plan** — `CONTEXT.md` (stack, conventions, config format). The question still open
-   belongs to area 2.
-2. ⏳ **Design** — mockups of setup, the commit list, a commit's files and diff, the transfer
-   preview and the conflict state.
+1. ✅ **Plan** — `CONTEXT.md` (stack, conventions, config format).
+2. ✅ **Design** — `DESIGN.md` and approved mockups of nine screens: pairs, the main screen,
+   pair settings, a target with changes, preview, guard refusal, conflict, staged and the
+   discard confirmation. What is left undrawn is listed at the end of `DESIGN.md`.
 3. ✅ **Git layer** — `internal/git` shells out to `git`: commit list, per-commit files and
    diff, trees and the history walk, dirty check, preimage import, preview, apply, reset and
    `SQUASH_MSG`. `internal/transfer` orders them — refuse before writing — and computes the
    position. Exclusions arrive as a predicate and guard patterns compiled; matching them and
    the config file are area 6. Tested against scratch repositories with unrelated histories.
 4. ⏳ **Server** — loopback binding, token, `Host`/`Origin` checks, JSON API over the git layer.
+   The design also needs per-file line counts, which the git layer does not report yet.
 5. ⏳ **UI** — the screens from area 2.
 6. 🛠️ **Exclusions and content guard** — `internal/pair` reads and writes each pair's config
    and lists the remembered pairs; exclusions are matched and guard patterns compiled there.

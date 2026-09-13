@@ -1,0 +1,162 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap">
+  <style>
+    body { margin: 0; background: #15171b; }
+    a { color: #6fc2b4; } a:hover { color: #9adbd0; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
+    .eyebrow { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #6c737e; }
+    .crow { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 16px 0 14px; border-left: 2px solid transparent; }
+    .crow > span { flex-shrink: 0; box-sizing: border-box; }
+    .crow > span:nth-child(3) { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .frow { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 16px; }
+    .dl { display: grid; grid-template-columns: 44px 44px 1fr; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 20px; white-space: pre; }
+    .dl span:nth-child(-n+2) { color: #525862; text-align: right; padding-right: 10px; }
+    .add { background: rgba(111, 170, 120, 0.12); color: #b9dcbf; }
+    .del { background: rgba(200, 110, 110, 0.12); color: #e3b3b3; }
+    .hunk { color: #7f93b3; background: #1a1d23; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; background: #15171b; color: #d4d7dd; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column;">
+
+  <div style="height: 48px; display: flex; align-items: center; gap: 20px; padding: 0 18px; border-bottom: 1px solid #262a31; background: #121418;">
+    <div class="mono" style="font-weight: 700; font-size: 15px; color: #eef0f3;">floe</div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="color: #eef0f3; font-weight: 500;">app-internal</span>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#6c737e" stroke-width="1.5"><path d="M3 8h10M9 4l4 4-4 4"></path></svg>
+      <span style="color: #eef0f3; font-weight: 500;">app-public</span>
+    </div>
+    <div style="flex-grow: 1;"></div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="display: flex; align-items: center; gap: 6px; padding: 3px 9px; border: 1px solid #2c3139; border-radius: 4px; color: #aeb4bd;"><span style="width: 6px; height: 6px; border-radius: 3px; background: #6fc2b4;"></span>target clean</span>
+      <span class="mono" style="padding: 3px 9px; border: 1px solid #2c3139; border-radius: 4px; color: #aeb4bd; font-size: 12px;">matches 3f2a91c</span>
+      <span style="padding: 3px 9px; border: 1px solid #2c3139; border-radius: 4px; color: #aeb4bd;">2 exclusions · 3 guard patterns</span>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; display: grid; grid-template-columns: 380px 330px minmax(0, 1fr); min-height: 0;">
+
+    <div style="border-right: 1px solid #262a31; display: flex; flex-direction: column;">
+      <div class="eyebrow" style="padding: 14px 16px 10px;">Source history</div>
+      <div class="crow">
+        <span style="width: 8px; height: 8px; border-radius: 4px; border: 1.5px solid #8a919b;"></span>
+        <span class="mono" style="color: #7b828c; font-size: 12px;">9c41e07</span>
+        <span style="flex-grow: 1;">Retry webhook deliveries with backoff</span>
+        <span style="color: #6c737e;">2h</span>
+      </div>
+      <div class="crow" style="background: #1f232a; border-left-color: #6fc2b4;">
+        <span style="width: 8px; height: 8px; border-radius: 4px; border: 1.5px solid #6fc2b4;"></span>
+        <span class="mono" style="color: #9aa1ab; font-size: 12px;">5b2d8f3</span>
+        <span style="flex-grow: 1; color: #eef0f3;">Move rate limits into config</span>
+        <span style="color: #6c737e;">1d</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 10px; padding: 8px 16px;">
+        <div style="flex-grow: 1; height: 1px; background: #3a6f67;"></div>
+        <span style="color: #6fc2b4; font-size: 12px;">app-public is here</span>
+        <div style="flex-grow: 1; height: 1px; background: #3a6f67;"></div>
+      </div>
+      <div class="crow">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #6fc2b4;"></span>
+        <span class="mono" style="color: #7b828c; font-size: 12px;">3f2a91c</span>
+        <span style="flex-grow: 1;">Merge branch 'invoice-export'</span>
+        <span style="color: #6c737e;">3d</span>
+      </div>
+      <div class="crow" style="color: #7b828c;">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #3a3f47;"></span>
+        <span class="mono" style="font-size: 12px;">a7d0b54</span>
+        <span style="flex-grow: 1;">Fix timezone in daily digest</span>
+        <span>4d</span>
+      </div>
+      <div class="crow" style="color: #7b828c;">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #3a3f47;"></span>
+        <span class="mono" style="font-size: 12px;">0c9e112</span>
+        <span style="flex-grow: 1;">Bump Go to 1.24</span>
+        <span>6d</span>
+      </div>
+      <div class="crow" style="color: #7b828c;">
+        <span style="width: 8px; height: 8px; border-radius: 4px; background: #3a3f47;"></span>
+        <span class="mono" style="font-size: 12px;">71be4d9</span>
+        <span style="flex-grow: 1;">Add health endpoint</span>
+        <span>9d</span>
+      </div>
+    </div>
+
+    <div style="border-right: 1px solid #262a31; display: flex; flex-direction: column;">
+      <div style="padding: 14px 16px 14px; border-bottom: 1px solid #262a31; display: flex; flex-direction: column; gap: 6px;">
+        <div style="font-size: 15px; font-weight: 600; color: #eef0f3;">Move rate limits into config</div>
+        <div style="color: #7b828c;">Hunter · 1 day ago · <span class="mono" style="font-size: 12px;">5b2d8f3</span></div>
+        <div style="color: #aeb4bd; line-height: 19px; margin-top: 4px;">Limits were constants in two places. Read them from config/limits.yaml so staging can run looser.</div>
+      </div>
+      <div class="eyebrow" style="padding: 14px 16px 8px;">Files · 3 of 5 cross</div>
+      <div class="frow" style="background: #1f232a;">
+        <svg width="14" height="14" viewBox="0 0 14 14"><rect x="0.75" y="0.75" width="12.5" height="12.5" rx="2" fill="#6fc2b4" stroke="#6fc2b4"></rect><path d="M3.5 7.2l2.3 2.3 4.7-4.9" fill="none" stroke="#15171b" stroke-width="1.6"></path></svg>
+        <span class="mono" style="color: #d9b36c; font-size: 12px; width: 10px;">M</span>
+        <span class="mono" style="flex-grow: 1; font-size: 12px; color: #eef0f3;">internal/limits/limits.go</span>
+      </div>
+      <div class="frow">
+        <svg width="14" height="14" viewBox="0 0 14 14"><rect x="0.75" y="0.75" width="12.5" height="12.5" rx="2" fill="#6fc2b4" stroke="#6fc2b4"></rect><path d="M3.5 7.2l2.3 2.3 4.7-4.9" fill="none" stroke="#15171b" stroke-width="1.6"></path></svg>
+        <span class="mono" style="color: #8fc59a; font-size: 12px; width: 10px;">A</span>
+        <span class="mono" style="flex-grow: 1; font-size: 12px;">config/limits.yaml</span>
+      </div>
+      <div class="frow">
+        <svg width="14" height="14" viewBox="0 0 14 14"><rect x="0.75" y="0.75" width="12.5" height="12.5" rx="2" fill="#6fc2b4" stroke="#6fc2b4"></rect><path d="M3.5 7.2l2.3 2.3 4.7-4.9" fill="none" stroke="#15171b" stroke-width="1.6"></path></svg>
+        <span class="mono" style="color: #d9b36c; font-size: 12px; width: 10px;">M</span>
+        <span class="mono" style="flex-grow: 1; font-size: 12px;">cmd/server/main.go</span>
+      </div>
+      <div class="frow" style="color: #666c75;">
+        <svg width="14" height="14" viewBox="0 0 14 14"><rect x="0.75" y="0.75" width="12.5" height="12.5" rx="2" fill="none" stroke="#3a3f47"></rect><path d="M4 7h6" stroke="#4a5059" stroke-width="1.5"></path></svg>
+        <span class="mono" style="font-size: 12px; width: 10px;">M</span>
+        <span class="mono" style="flex-grow: 1; font-size: 12px; text-decoration: line-through;">README.md</span>
+        <span style="font-size: 11px;">excluded</span>
+      </div>
+      <div class="frow" style="color: #666c75;">
+        <svg width="14" height="14" viewBox="0 0 14 14"><rect x="0.75" y="0.75" width="12.5" height="12.5" rx="2" fill="none" stroke="#3a3f47"></rect><path d="M4 7h6" stroke="#4a5059" stroke-width="1.5"></path></svg>
+        <span class="mono" style="font-size: 12px; width: 10px;">M</span>
+        <span class="mono" style="flex-grow: 1; font-size: 12px; text-decoration: line-through;">.github/workflows/ci.yml</span>
+        <span style="font-size: 11px;">excluded</span>
+      </div>
+      <div style="flex-grow: 1;"></div>
+      <div style="padding: 16px; border-top: 1px solid #262a31; display: flex; flex-direction: column; gap: 8px;">
+        <div style="height: 36px; border-radius: 5px; background: #6fc2b4; color: #0f1a18; font-weight: 600; display: flex; align-items: center; justify-content: center;">Preview transfer</div>
+        <div style="color: #6c737e; font-size: 12px; text-align: center;">Lands staged in app-public. You write the commit.</div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; min-width: 0;">
+      <div style="height: 44px; display: flex; align-items: center; gap: 12px; padding: 0 16px; border-bottom: 1px solid #262a31;">
+        <span class="mono" style="font-size: 12px; color: #eef0f3;">internal/limits/limits.go</span>
+        <span class="mono" style="font-size: 12px; color: #8fc59a;">+4</span>
+        <span class="mono" style="font-size: 12px; color: #d59090;">−5</span>
+      </div>
+      <div style="padding: 10px 0;">
+        <div class="dl hunk"><span></span><span></span><span>@@ -12,11 +12,10 @@ package limits</span></div>
+        <div class="dl"><span>12</span><span>12</span><span> import (</span></div>
+        <div class="dl"><span>13</span><span>13</span><span>     "time"</span></div>
+        <div class="dl add"><span></span><span>14</span><span>+    "example.com/app/internal/config"</span></div>
+        <div class="dl"><span>14</span><span>15</span><span> )</span></div>
+        <div class="dl"><span>15</span><span>16</span><span> </span></div>
+        <div class="dl del"><span>16</span><span></span><span>-const (</span></div>
+        <div class="dl del"><span>17</span><span></span><span>-    perMinute = 120</span></div>
+        <div class="dl del"><span>18</span><span></span><span>-    burst     = 40</span></div>
+        <div class="dl del"><span>19</span><span></span><span>-)</span></div>
+        <div class="dl del"><span>20</span><span></span><span>-</span></div>
+        <div class="dl add"><span></span><span>17</span><span>+func Load(cfg *config.Config) Limits {</span></div>
+        <div class="dl add"><span></span><span>18</span><span>+    return Limits{PerMinute: cfg.Limits.PerMinute, Burst: cfg.Limits.Burst}</span></div>
+        <div class="dl add"><span></span><span>19</span><span>+}</span></div>
+        <div class="dl"><span>21</span><span>20</span><span> </span></div>
+        <div class="dl"><span>22</span><span>21</span><span> type Limits struct {</span></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

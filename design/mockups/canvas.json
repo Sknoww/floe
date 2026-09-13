@@ -1,0 +1,34 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "Screens" },
+    { "id": "page-2", "name": "Directions A–C" }
+  ],
+  "artboards": [
+    { "file": "Pairs.dc.html", "title": "1 · Pairs", "x": 0, "y": 0, "w": 1440, "h": 900, "page": "page-1" },
+    { "file": "Main.dc.html", "title": "2 · Main screen", "x": 1560, "y": 0, "w": 1440, "h": 900, "page": "page-1" },
+    { "file": "PairSettings.dc.html", "title": "3 · Pair settings", "x": 3120, "y": 0, "w": 1440, "h": 900, "page": "page-1" },
+    { "file": "DirtyTarget.dc.html", "title": "4 · Target has changes", "x": 0, "y": 1300, "w": 1440, "h": 900, "page": "page-1" },
+    { "file": "Preview.dc.html", "title": "5 · Preview", "x": 1560, "y": 1300, "w": 1440, "h": 900, "page": "page-1" },
+    { "file": "GuardRefused.dc.html", "title": "6 · Refused by the guard", "x": 3120, "y": 1300, "w": 1440, "h": 900, "page": "page-1" },
+    { "file": "Conflict.dc.html", "title": "7 · Conflict", "x": 0, "y": 2600, "w": 1440, "h": 900, "page": "page-1" },
+    { "file": "Staged.dc.html", "title": "8 · Staged", "x": 1560, "y": 2600, "w": 1440, "h": 900, "page": "page-1" },
+    { "file": "AbortDialog.dc.html", "title": "9 · Discard", "x": 3120, "y": 2600, "w": 560, "h": 320, "page": "page-1" },
+    { "file": "DirectionA.dc.html", "title": "A · Three panes", "x": 0, "y": 0, "w": 1440, "h": 900, "page": "page-2" },
+    { "file": "DirectionB.dc.html", "title": "B · History ledger", "x": 1560, "y": 0, "w": 1440, "h": 900, "page": "page-2" },
+    { "file": "DirectionC.dc.html", "title": "C · Source to target", "x": 3120, "y": 0, "w": 1440, "h": 900, "page": "page-2" }
+  ],
+  "annotations": [
+    { "id": "screens-brief", "page": "page-1", "x": 0, "y": -330, "w": 1100, "text": "floe — screens\nOne transfer, start to finish: open a pair (1), pick a commit (2), preview it (5), apply it, and it stops on a conflict (7) that you resolve until it is staged (8). A transfer with no conflict goes straight from 5 to 8. Rows read left to right. 3, 4, 6 and 9 branch off that path.\nDecisions to confirm: (a) what Open in editor launches is still an open question: code, $VISUAL, or a setting. (b) Pair settings save with an explicit Save. (c) A target with changes is checked again when the window regains focus, and on Check again.\nNot drawn: app-public's HEAD moving after a preview (floe previews again), git refusing a patch (its message shows in the target panel), and a binary file in a preview (named there, since the guard can't scan it)." },
+    { "id": "note-pairs", "page": "page-1", "x": 0, "y": 940, "w": 700, "text": "Bare floe. New pairs open from the terminal. A pair whose repository moved, or whose file can't be read, stays listed with the reason instead of vanishing." },
+    { "id": "note-settings", "page": "page-1", "x": 3120, "y": 940, "w": 700, "text": "Reached from the pair name in the top bar or the target panel's pattern counts. Invalid patterns are refused as you add them, with floe's own suggestion one click away." },
+    { "id": "note-preview", "page": "page-1", "x": 1560, "y": 2240, "w": 700, "text": "Every check runs before anything visible is written. app-public changed the same line of cmd/server/main.go, so the preview says up front that this file will conflict. The markers are shown as git will write them into the file." },
+    { "id": "note-conflict", "page": "page-1", "x": 0, "y": 3540, "w": 700, "text": "The commit message is written even when the transfer stops on a conflict, so it is waiting in your commit box once you've resolved it." },
+    { "id": "note-guard", "page": "page-1", "x": 3120, "y": 2240, "w": 700, "text": "A variant of this commit, with an internal URL in config/limits.yaml. The guard refuses at the first check that matches, so a match in the patch is reported before the merge is ever tried. A line the merge brings in is refused the same way, tagged \"brought in by the merge\"." },
+    { "id": "note-abort", "page": "page-1", "x": 3120, "y": 2980, "w": 560, "text": "From Discard transfer on the conflict or staged screen. It is one operation either way, so it is one confirmation." },
+    { "id": "brief", "page": "page-2", "x": 0, "y": -260, "w": 900, "text": "floe — pick a direction\nThe same moment in each: app-public matches source commit 3f2a91c, and the next commit, 5b2d8f3, is selected with two of its files excluded. These sketches are about layout and tone. The other screens (setup, preview, guard and dirty refusals, staged, conflict) get drawn in whichever you choose." },
+    { "id": "why-a", "page": "page-2", "x": 0, "y": 960, "w": 620, "text": "A · Three panes\nCommits, files and diff side by side. Dark and dense, like a git client.\nFor: every step of a transfer at one glance, and it holds up on long histories.\nAgainst: the diff gets the least width, and where the target stands is only a divider in the list and a chip in the bar, never a place of its own." },
+    { "id": "why-b", "page": "page-2", "x": 1560, "y": 960, "w": 620, "text": "B · History ledger\nOne calm, light column. The source history is a timeline with a line where the target stands, and a commit opens in place.\nFor: transfers go one commit at a time, in order, and this reads as that sequence.\nAgainst: a long diff pushes the history off screen, and it shows less at a glance on a wide monitor." },
+    { "id": "why-c", "page": "page-2", "x": 3120, "y": 960, "w": 620, "text": "C · Source to target\nSource on the left, target on the right, the crossing commit between. The target column holds its state, where it stands and what a transfer will do.\nFor: the direction and the target's safety checks frame the whole app.\nAgainst: three panels of chrome before any diff, and the target column is sparse until a preview runs." }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}

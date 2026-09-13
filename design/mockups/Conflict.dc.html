@@ -1,0 +1,179 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap">
+  <style>
+    body { margin: 0; background: #15171b; }
+    a { color: #6fc2b4; } a:hover { color: #9adbd0; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
+    .eyebrow { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #6c737e; }
+    .head { padding: 16px 18px 14px; border-bottom: 1px solid #262a31; display: flex; flex-direction: column; gap: 4px; }
+    .crow { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 16px 0 14px; border-left: 2px solid transparent; }
+    .crow > span { flex-shrink: 0; box-sizing: border-box; }
+    .crow > span:nth-child(3) { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .frow { display: flex; align-items: center; gap: 10px; height: 30px; padding: 0 20px; }
+    .rl { display: grid; grid-template-columns: 48px 1fr auto; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 20px; white-space: pre; padding-right: 20px; }
+    .rl > span:first-child { color: #525862; text-align: right; padding-right: 12px; }
+    .rl > span:nth-child(3) { font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 11px; }
+    .mk { color: #d9b36c; background: rgba(217, 179, 108, 0.10); }
+    .ours { background: rgba(127, 147, 179, 0.10); }
+    .theirs { background: rgba(111, 194, 180, 0.09); }
+    .tag { font-size: 11px; padding: 1px 7px; border-radius: 3px; flex-shrink: 0; }
+    .res { display: flex; align-items: center; gap: 10px; height: 30px; }
+    .res > span:nth-child(1) { flex: 1 1 auto; min-width: 0; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .btn { height: 38px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-weight: 600; box-sizing: border-box; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; background: #15171b; color: #d4d7dd; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column;">
+
+  <div style="height: 48px; flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: 0 18px; border-bottom: 1px solid #262a31; background: #121418;">
+    <span class="mono" style="font-weight: 700; font-size: 15px; color: #eef0f3;">floe</span>
+    <span style="color: #3a3f47;">/</span>
+    <span style="display: flex; align-items: center; gap: 8px; color: #eef0f3; font-weight: 500;">app-internal <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#6c737e" stroke-width="1.5"><path d="M3 8h10M9 4l4 4-4 4"></path></svg> app-public</span>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#6c737e" stroke-width="1.5"><path d="M3.5 5.5L7 9l3.5-3.5"></path></svg>
+  </div>
+
+  <div style="flex-grow: 1; display: grid; grid-template-columns: 340px minmax(0, 1fr) 300px; min-height: 0;">
+
+    <div style="border-right: 1px solid #262a31; display: flex; flex-direction: column;">
+      <div class="head">
+        <span class="eyebrow">Source</span>
+        <span style="font-size: 16px; font-weight: 600; color: #eef0f3;">app-internal</span>
+        <span class="mono" style="font-size: 11px; color: #6c737e;">~/dev/app-internal · main</span>
+      </div>
+      <div style="padding-top: 6px; display: flex; flex-direction: column;">
+        <div class="crow">
+          <span style="width: 8px; height: 8px; border-radius: 4px; border: 1.5px solid #8a919b;"></span>
+          <span class="mono" style="color: #7b828c; font-size: 12px;">9c41e07</span>
+          <span>Retry webhook deliveries with backoff</span>
+          <span style="color: #6c737e;">2h</span>
+        </div>
+        <div class="crow" style="background: #1f232a; border-left-color: #6fc2b4;">
+          <span style="width: 8px; height: 8px; border-radius: 4px; border: 1.5px solid #d9b36c;"></span>
+          <span class="mono" style="color: #9aa1ab; font-size: 12px;">5b2d8f3</span>
+          <span style="color: #eef0f3;">Move rate limits into config</span>
+          <span class="tag" style="color: #d9b36c; background: rgba(217, 179, 108, 0.12);">conflict</span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 8px 16px;">
+          <div style="flex-grow: 1; height: 1px; background: #3a6f67;"></div>
+          <span style="color: #6fc2b4; font-size: 12px;">app-public is here</span>
+          <div style="flex-grow: 1; height: 1px; background: #3a6f67;"></div>
+        </div>
+        <div class="crow">
+          <span style="width: 8px; height: 8px; border-radius: 4px; background: #6fc2b4;"></span>
+          <span class="mono" style="color: #7b828c; font-size: 12px;">3f2a91c</span>
+          <span>Merge branch 'invoice-export'</span>
+          <span style="color: #6c737e;">3d</span>
+        </div>
+        <div class="crow" style="color: #7b828c;">
+          <span style="width: 8px; height: 8px; border-radius: 4px; background: #3a3f47;"></span>
+          <span class="mono" style="font-size: 12px;">a7d0b54</span>
+          <span>Fix timezone in daily digest</span>
+          <span>4d</span>
+        </div>
+        <div class="crow" style="color: #7b828c;">
+          <span style="width: 8px; height: 8px; border-radius: 4px; background: #3a3f47;"></span>
+          <span class="mono" style="font-size: 12px;">0c9e112</span>
+          <span>Bump Go to 1.24</span>
+          <span>6d</span>
+        </div>
+        <div class="crow" style="color: #7b828c;">
+          <span style="width: 8px; height: 8px; border-radius: 4px; background: #3a3f47;"></span>
+          <span class="mono" style="font-size: 12px;">71be4d9</span>
+          <span>Add health endpoint</span>
+          <span>9d</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="border-right: 1px solid #262a31; display: flex; flex-direction: column; min-width: 0;">
+      <div class="head" style="padding: 16px 20px 14px; gap: 5px;">
+        <span class="eyebrow">Crossing · conflict</span>
+        <span style="font-size: 17px; font-weight: 600; color: #eef0f3;">Move rate limits into config</span>
+        <span style="color: #7b828c;"><span class="mono" style="font-size: 12px;">5b2d8f3</span> · Hunter · 1 day ago</span>
+        <span style="color: #aeb4bd; line-height: 19px; margin-top: 2px;">Limits were constants in two places. Read them from config/limits.yaml so staging can run looser.</span>
+      </div>
+      <div style="padding: 10px 0; border-bottom: 1px solid #262a31; display: flex; flex-direction: column;">
+        <div class="eyebrow" style="padding: 2px 20px 6px;">Files · 3 of 5 crossed</div>
+        <div class="frow">
+          <span class="mono" style="color: #d9b36c; font-size: 12px; width: 10px;">M</span>
+          <span class="mono" style="flex-grow: 1; font-size: 12px;">internal/limits/limits.go</span>
+          <span class="tag" style="color: #6fc2b4; background: rgba(111, 194, 180, 0.10);">staged</span>
+        </div>
+        <div class="frow">
+          <span class="mono" style="color: #8fc59a; font-size: 12px; width: 10px;">A</span>
+          <span class="mono" style="flex-grow: 1; font-size: 12px;">config/limits.yaml</span>
+          <span class="tag" style="color: #6fc2b4; background: rgba(111, 194, 180, 0.10);">staged</span>
+        </div>
+        <div class="frow" style="background: #1f232a;">
+          <span class="mono" style="color: #d9b36c; font-size: 12px; width: 10px;">M</span>
+          <span class="mono" style="flex-grow: 1; font-size: 12px; color: #eef0f3;">cmd/server/main.go</span>
+          <span class="tag" style="color: #d9b36c; background: rgba(217, 179, 108, 0.12);">conflict</span>
+        </div>
+        <div class="frow" style="color: #666c75;">
+          <span class="mono" style="font-size: 12px; width: 10px;">M</span>
+          <span class="mono" style="flex-grow: 1; font-size: 12px; text-decoration: line-through;">README.md</span>
+          <span style="font-size: 11px;">excluded</span>
+        </div>
+        <div class="frow" style="color: #666c75;">
+          <span class="mono" style="font-size: 12px; width: 10px;">M</span>
+          <span class="mono" style="flex-grow: 1; font-size: 12px; text-decoration: line-through;">.github/workflows/ci.yml</span>
+          <span style="font-size: 11px;">excluded</span>
+        </div>
+      </div>
+      <div style="height: 40px; flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 0 20px; border-bottom: 1px solid #262a31;">
+        <span class="mono" style="font-size: 12px; color: #eef0f3;">cmd/server/main.go</span>
+        <span style="color: #7b828c;">in app-public's working tree</span>
+      </div>
+      <div style="padding: 10px 0;">
+        <div class="rl"><span>38</span><span>func main() {</span><span></span></div>
+        <div class="rl"><span>39</span><span>    cfg := config.MustLoad()</span><span></span></div>
+        <div class="rl"><span>40</span><span>    log := logging.New(cfg.LogLevel)</span><span></span></div>
+        <div class="rl mk"><span>41</span><span>&lt;&lt;&lt;&lt;&lt;&lt;&lt; ours</span><span style="color: #9fb0c9;">app-public's line</span></div>
+        <div class="rl ours"><span>42</span><span>    srv := server.New(cfg, server.WithLogger(log))</span><span></span></div>
+        <div class="rl mk"><span>43</span><span>=======</span><span></span></div>
+        <div class="rl theirs"><span>44</span><span>    srv := server.New(cfg, server.WithLimits(limits.Load(cfg)))</span><span></span></div>
+        <div class="rl mk"><span>45</span><span>&gt;&gt;&gt;&gt;&gt;&gt;&gt; theirs</span><span style="color: #8fcfc4;">from 5b2d8f3</span></div>
+        <div class="rl"><span>46</span><span>    if err := srv.Run(); err != nil {</span><span></span></div>
+        <div class="rl"><span>47</span><span>        log.Fatal(err)</span><span></span></div>
+        <div class="rl"><span>48</span><span>    }</span><span></span></div>
+        <div class="rl"><span>49</span><span>}</span><span></span></div>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column;">
+      <div class="head">
+        <span class="eyebrow">Target</span>
+        <span style="font-size: 16px; font-weight: 600; color: #eef0f3;">app-public</span>
+        <span class="mono" style="font-size: 11px; color: #6c737e;">~/dev/app-public · main @ 8e3c1aa</span>
+      </div>
+      <div style="padding: 14px 18px; display: flex; flex-direction: column; gap: 16px;">
+        <div style="display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 5px; background: rgba(217, 179, 108, 0.08); border: 1px solid rgba(217, 179, 108, 0.25);">
+          <span style="display: flex; align-items: center; gap: 8px; color: #d9b36c; font-weight: 600;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#d9b36c" stroke-width="1.4"><path d="M7 1.8l5.6 10H1.4z"></path><path d="M7 5.6v2.6M7 9.8v.3"></path></svg>Stopped on a conflict</span>
+          <span style="color: #aeb4bd; line-height: 19px;">2 files staged cleanly. 1 file has conflict markers.</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <div class="res"><span style="color: #eef0f3;">cmd/server/main.go</span><span class="tag" style="color: #d9b36c; background: rgba(217, 179, 108, 0.12);">conflict</span></div>
+          <div class="res"><span>internal/limits/limits.go</span><span class="tag" style="color: #6fc2b4; background: rgba(111, 194, 180, 0.10);">staged</span></div>
+          <div class="res"><span>config/limits.yaml</span><span class="tag" style="color: #6fc2b4; background: rgba(111, 194, 180, 0.10);">staged</span></div>
+        </div>
+        <span style="color: #9aa1ab; line-height: 19px;">Resolve the markers in your editor and stage the file. Floe checks again when you come back to its window. The commit message is already in your commit box.</span>
+      </div>
+      <div style="flex-grow: 1;"></div>
+      <div style="padding: 18px; border-top: 1px solid #262a31; display: flex; flex-direction: column; gap: 8px;">
+        <div class="btn" style="background: #6fc2b4; color: #0f1a18;">Open in editor</div>
+        <div class="btn" style="border: 1px solid rgba(224, 130, 111, 0.45); color: #e0826f;">Discard transfer</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap">
+  <style>
+    body { margin: 0; background: #15171b; }
+    a { color: #6fc2b4; } a:hover { color: #9adbd0; }
+    .mono { font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; }
+    .prow { display: flex; align-items: center; gap: 16px; padding: 16px 20px; border-bottom: 1px solid #22262c; }
+    .prow > div:first-child { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
+  </style>
+</helmet>
+<div style="width: 1440px; height: 900px; background: #15171b; color: #d4d7dd; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 13px; display: flex; flex-direction: column;">
+
+  <div style="height: 48px; flex-shrink: 0; display: flex; align-items: center; gap: 16px; padding: 0 18px; border-bottom: 1px solid #262a31; background: #121418;">
+    <span class="mono" style="font-weight: 700; font-size: 15px; color: #eef0f3;">floe</span>
+  </div>
+
+  <div style="width: 820px; align-self: center; padding-top: 64px; display: flex; flex-direction: column; gap: 24px;">
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <span style="font-size: 22px; font-weight: 600; color: #eef0f3;">Pairs</span>
+      <span style="color: #7b828c;">Most recently opened first.</span>
+    </div>
+
+    <div style="border: 1px solid #262a31; border-radius: 6px; display: flex; flex-direction: column; overflow: hidden;">
+      <div class="prow" style="background: #1a1d22;">
+        <div>
+          <span style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 500; color: #eef0f3;">app-internal <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#6c737e" stroke-width="1.5"><path d="M3 8h10M9 4l4 4-4 4"></path></svg> app-public</span>
+          <span class="mono" style="font-size: 11px; color: #6c737e;">~/dev/app-internal → ~/dev/app-public</span>
+        </div>
+        <span style="color: #7b828c; flex-shrink: 0;">opened 2 hours ago</span>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#6c737e" stroke-width="1.5" style="flex-shrink: 0;"><path d="M5.5 3.5L9 7l-3.5 3.5"></path></svg>
+      </div>
+
+      <div class="prow">
+        <div>
+          <span style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 500; color: #eef0f3;">billing-core <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#6c737e" stroke-width="1.5"><path d="M3 8h10M9 4l4 4-4 4"></path></svg> billing-sdk</span>
+          <span class="mono" style="font-size: 11px; color: #6c737e;">~/work/billing-core → ~/work/billing-sdk</span>
+        </div>
+        <span style="color: #7b828c; flex-shrink: 0;">opened 3 days ago</span>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#6c737e" stroke-width="1.5" style="flex-shrink: 0;"><path d="M5.5 3.5L9 7l-3.5 3.5"></path></svg>
+      </div>
+
+      <div class="prow">
+        <div>
+          <span style="display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 500; color: #7b828c;">docs-private <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#4a5059" stroke-width="1.5"><path d="M3 8h10M9 4l4 4-4 4"></path></svg> docs-site</span>
+          <span style="display: flex; align-items: center; gap: 7px; color: #d9b36c;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#d9b36c" stroke-width="1.4"><path d="M7 1.8l5.6 10H1.4z"></path><path d="M7 5.6v2.6M7 9.8v.3"></path></svg><span class="mono" style="font-size: 12px;">~/dev/docs-private</span> is missing</span>
+          <span style="color: #6c737e;">Moved or deleted. A pair is remembered by both paths, so moving a repository leaves its pair behind.</span>
+        </div>
+        <span style="color: #6c737e; flex-shrink: 0;">opened 5 weeks ago</span>
+        <span style="width: 14px; flex-shrink: 0;"></span>
+      </div>
+
+      <div class="prow" style="border-bottom: none;">
+        <div>
+          <span style="display: flex; align-items: center; gap: 7px; color: #e0826f;"><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="#e0826f" stroke-width="1.5"><circle cx="7" cy="7" r="5.5"></circle><path d="M3.1 10.9l7.8-7.8"></path></svg><span class="mono" style="font-size: 12px;">tools--tools-public-1c9e44ab.json</span> can't be read</span>
+          <span class="mono" style="font-size: 12px; color: #c9a39c;">guard[1]: error parsing regexp: missing closing ): `(?i)acme (corp`</span>
+          <span style="color: #6c737e;">Fix the file in <span class="mono" style="font-size: 12px;">~/.config/floe/pairs/</span>, then reload.</span>
+        </div>
+        <span style="width: 14px; flex-shrink: 0;"></span>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; color: #7b828c;">
+      <span>Open a new pair from a terminal</span>
+      <span class="mono" style="font-size: 12px; color: #d4d7dd; padding: 5px 10px; border: 1px solid #262a31; border-radius: 4px; background: #121418;">floe ~/dev/source ~/dev/target</span>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
