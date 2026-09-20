@@ -7,7 +7,7 @@
   import { Api, ApiError } from './lib/api'
   import { readSession, writePair } from './lib/session'
   import Blocked from './lib/icons/Blocked.svelte'
-  import PairScreen from './screens/Pair.svelte'
+  import MainScreen from './screens/Main.svelte'
   import PairsScreen from './screens/Pairs.svelte'
   import TopBar from './lib/TopBar.svelte'
   import type { Pair, Pairs } from './lib/types'
@@ -69,7 +69,7 @@
 </script>
 
 {#if open}
-  <PairScreen pair={open} home={pairs?.home} onpairs={toPairs} />
+  <MainScreen {api} pair={open} home={pairs?.home} onpairs={toPairs} />
 {:else if pairs}
   {#if failure}
     <div class="banner">

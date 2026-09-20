@@ -98,10 +98,13 @@ None.
    Svelte 5 + TypeScript into the `dist/` the binary embeds, with the foundations from
    `DESIGN.md` as custom properties in `src/app.css`, the fonts self-hosted, a typed client
    over the whole API, and the token and open pair read from the URL fragment. The dev loop
-   is live: `npm run dev` proxies `/api` to a `dev`-tagged floe, with hot reload. **Screen 1,
-   Pairs**, is built, including a missing repository and an unreadable pair file. Still to
-   come: the main screen and its diff component, then preview, guard refusal, conflict,
-   staged, the discard dialog, and pair settings with area 6.
+   is live: `npm run dev` proxies `/api` to a `dev`-tagged floe, with hot reload. Built so
+   far: **screen 1, Pairs**, including a missing repository and an unreadable pair file;
+   **screen 2, the main screen**, with the commit list and where the target stands, the
+   crossing commit's files with unticking, and floe's own diff component over git's unified
+   output; and **screen 4**, the same screen with a target that has changes. Still to come:
+   preview, guard refusal, conflict, staged, the discard dialog, and pair settings with
+   area 6.
 6. 🛠️ **Exclusions and content guard** — `internal/pair` reads and writes each pair's config
    and lists the remembered pairs; exclusions are matched and guard patterns compiled there.
    The guard also scans what a 3-way merge brings in. The API saves both lists and checks a

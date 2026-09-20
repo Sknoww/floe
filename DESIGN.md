@@ -88,7 +88,9 @@ border on a callout.
 - **File row**: checkbox, status letter (`M` amber, `A` green, `D` red), path, then line
   counts or a result tag.
   - An excluded file is struck through, dimmed, labelled `excluded`, and its checkbox
-    shows a dash. It stays in the list.
+    shows a dash. It stays in the list, at the bottom of it: the list reads as what
+    crosses, with what never does beneath. Within each group the order is git's. A file
+    unticked for one transfer dims where it is and does not move.
   - After apply there are no checkboxes: the row's tag says what happened.
 - **Diff**: two gutters, old and new line numbers, 48px each, then the line. Hunk
   headers in their own colour. Our own component, never a library.
