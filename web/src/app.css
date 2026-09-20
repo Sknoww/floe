@@ -47,6 +47,23 @@
   --hunk-bg: #1a1d23;
   --line-number: #525862;
 
+  /* A conflict: neither side is a failure, so both are tints rather than
+     alarms, and only the marker lines themselves ask for attention. */
+  --marker-bg: rgba(217, 179, 108, 0.1);
+  --ours-bg: rgba(127, 147, 179, 0.1);
+  --ours-label: #9fb0c9;
+  --theirs-bg: rgba(111, 194, 180, 0.09);
+  --theirs-label: #8fcfc4;
+
+  /* A guard match: the line that refused the transfer, and the text in it the
+     pattern matched. */
+  --hit-bg: rgba(224, 130, 111, 0.16);
+  --hit-text: #f0c2b8;
+  --hit-edge: #e0826f;
+  --mark-bg: rgba(224, 130, 111, 0.35);
+  --mark-text: #ffe2dc;
+  --match-line: #c9a39c;
+
   /* Type: IBM Plex Sans for the interface, JetBrains Mono for everything git
      produced. */
   --font-sans: 'IBM Plex Sans', system-ui, sans-serif;

@@ -1,9 +1,14 @@
 <script lang="ts">
   /*
-   * Screen 2 — the main screen, and screen 4 when the target has changes.
-   * Source, crossing, target: three columns, left to right in the direction a
-   * commit travels. Every action that writes to the target sits in the target
-   * column, under the sentence that says what it will do.
+   * The three-column shell — source, crossing, target — left to right in the
+   * direction a commit travels, and the screens that live in it: screen 2, the
+   * main screen; screen 4 when the target has changes; screen 5, the preview;
+   * and screen 6, a refusal by the content guard.
+   *
+   * Which of them is on screen is the phase below. The columns are the same
+   * three throughout — only the crossing detail and the target column change,
+   * and the target column is where the target's state and every action that
+   * writes to it live, so each phase's is its own file beside this one.
    */
   import { Api, ApiError } from '../lib/api'
   import { since } from '../lib/age'
@@ -11,11 +16,15 @@
   import Arrow from '../lib/icons/Arrow.svelte'
   import Chevron from '../lib/icons/Chevron.svelte'
   import CommitList from '../lib/CommitList.svelte'
+  import Conflict from '../lib/Conflict.svelte'
   import Diff from '../lib/Diff.svelte'
   import FileList from '../lib/FileList.svelte'
+  import GuardPanel from './GuardRefused.svelte'
+  import PreviewPanel from './Preview.svelte'
   import TopBar from '../lib/TopBar.svelte'
   import Warning from '../lib/icons/Warning.svelte'
-  import type { Commit, CommitDetail, File, Pair, Target } from '../lib/types'
+  import type { Tag } from '../lib/FileList.svelte'
+  import type { Commit, CommitDetail, File, Match, Pair, Preview, Part, Target } from '../lib/types'
 
   let {
     api,
@@ -33,6 +42,16 @@
   let diff = $state('')
   let skip = $state<string[]>([])
   let failure = $state('')
+
+  /** Which screen the shell is showing. */
+  type Phase = 'browse' | 'preview' | 'guard'
+  let phase = $state<Phase>('browse')
+  /** Screen 5: the checks that passed and what the transfer will do. */
+  let preview = $state<Preview | undefined>(undefined)
+  /** Screen 6: every match of the check that refused. */
+  let matches = $state<Match[]>([])
+  /** A preview or an apply is running. */
+  let busy = $state(false)
 
   /** Where the target stands in the list, and whether it is an exact match. */
   const at = $derived.by(() => {
@@ -55,12 +74,53 @@
   /** The user's own changes: dirty with no transfer of floe's to explain them. */
   const theirs = $derived(target && target.dirty.length > 0 && !waiting ? target.dirty : [])
   const clean = $derived(!!target && target.dirty.length === 0)
-  const canPreview = $derived(clean && crossing.length > 0)
+  const canPreview = $derived(clean && crossing.length > 0 && !busy)
 
   const tags = $derived.by(() => {
     if (!waiting) return {}
     const state = target && target.conflicts.length > 0 ? 'conflict' : 'staged'
     return { [waiting.commit]: state }
+  })
+
+  /*
+   * What each crossing file's row says in place of its line counts: what the
+   * preview found it will do, or that the guard matched in it. In neither case
+   * does the row move — the list is still what crosses, in git's order.
+   */
+  const fileTags = $derived.by<Record<string, Tag>>(() => {
+    if (phase === 'preview' && preview) {
+      const out: Record<string, Tag> = {}
+      for (const f of preview.result.files) {
+        out[f.path] = preview.result.conflicts.includes(f.path)
+          ? { text: 'will conflict', role: 'warn' }
+          : { text: 'merges cleanly', role: 'ok' }
+      }
+      return out
+    }
+    if (phase === 'guard') {
+      const out: Record<string, Tag> = {}
+      for (const m of matches) if (m.path) out[m.path] = { text: 'guard', role: 'bad' }
+      return out
+    }
+    return {}
+  })
+
+  /** The file open in the crossing column will land with markers in it. */
+  const openConflicts = $derived(
+    phase === 'preview' && !!preview && preview.result.conflicts.includes(openFile),
+  )
+
+  /*
+   * The guard's matches in the open file, by line number, for the diff to mark.
+   * A line the merge brought in is numbered in the merged result rather than in
+   * the file's new version, so it is left out: the patch has no line there to
+   * point at, and the match block already says where it came from.
+   */
+  const hits = $derived.by<Record<number, Part[]>>(() => {
+    if (phase !== 'guard') return {}
+    const out: Record<number, Part[]> = {}
+    for (const m of matches) if (m.path === openFile && !m.merged) out[m.lineNo] = m.parts
+    return out
   })
 
   void load()
@@ -90,6 +150,7 @@
     openFile = ''
     diff = ''
     skip = []
+    back()
     try {
       const d = await api.commit(pair.id, id)
       // A slower request for a commit since deselected must not win.
@@ -105,6 +166,9 @@
   async function show(path: string) {
     openFile = path
     diff = ''
+    // The diff is fetched even for a file the preview shows as it will land
+    // instead: it is the same request either way, and it means Back returns to
+    // a diff that is already there rather than to an empty pane.
     const of = selected
     try {
       const d = await api.diff(pair.id, of, path)
@@ -117,6 +181,84 @@
 
   function setSkip(path: string, crossThis: boolean) {
     skip = crossThis ? skip.filter((p) => p !== path) : [...skip, path]
+  }
+
+  /** Back to screen 2, dropping a preview or a refusal that no longer holds. */
+  function back() {
+    phase = 'browse'
+    preview = undefined
+    matches = []
+  }
+
+  /*
+   * Screen 5. Every check that can refuse the transfer runs here, before
+   * anything visible is written, so a refusal has nothing to undo — it is a
+   * screen, not an accident.
+   */
+  async function runPreview() {
+    busy = true
+    const of = selected
+    try {
+      const p = await api.preview(pair.id, of, skip)
+      if (selected !== of) return
+      matches = []
+      preview = p
+      phase = 'preview'
+      // A predicted conflict is the thing to look at, so open it.
+      const first = p.result.conflicts[0]
+      if (first) await show(first)
+    } catch (e) {
+      if (selected !== of) return
+      if (e instanceof ApiError && e.code === 'guard') {
+        // Screen 6. The target is untouched, so the refusal is the whole
+        // outcome: show every match, over the file the first one is in.
+        preview = undefined
+        matches = e.matches
+        phase = 'guard'
+        // Over the file the first match is in, unless it is already open: a
+        // later match's file is not the one to jump to.
+        const first = matches.find((m) => m.path)
+        if (first && first.path !== openFile) await show(first.path)
+        return
+      }
+      back()
+      failure = message(e)
+      // A target that changed under us is screen 4, and says so itself.
+      if (e instanceof ApiError && e.code === 'dirty') await recheck()
+    } finally {
+      busy = false
+    }
+  }
+
+  /*
+   * Applies the preview the screen is showing. The target is re-checked first,
+   * and a HEAD that moved since means the preview described a transfer that no
+   * longer holds: floe previews again rather than applying a stale one.
+   */
+  async function apply() {
+    if (!preview) return
+    busy = true
+    try {
+      await api.apply(pair.id, preview.id)
+      back()
+      target = await api.target(pair.id)
+    } catch (e) {
+      failure = message(e)
+      if (e instanceof ApiError && (e.code === 'stale' || e.code === 'preview_gone')) {
+        busy = false
+        await runPreview()
+        return
+      }
+      back()
+      await recheck()
+    } finally {
+      busy = false
+    }
+  }
+
+  /** Screen 6's way out that leaves the pair's settings alone. */
+  function untick(path: string) {
+    setSkip(path, false)
   }
 
   async function recheck() {
@@ -186,7 +328,7 @@
     <section class="column crossing">
       {#if commit}
         <div class="head wide">
-          <span class="eyebrow">Crossing</span>
+          <span class="eyebrow">Crossing{phase === 'preview' ? ' · preview' : ''}</span>
           <span class="subject">{commit.subject}</span>
           <span class="by">
             <span class="mono">{commit.id.slice(0, 7)}</span>
@@ -198,18 +340,35 @@
         </div>
 
         {#if detail}
-          <FileList {files} selected={openFile} {skip} onselect={show} onskip={setSkip} />
+          <FileList
+            {files}
+            selected={openFile}
+            {skip}
+            tags={fileTags}
+            locked={phase === 'preview'}
+            onselect={show}
+            onskip={setSkip}
+          />
           {#if openMeta}
             <div class="openbar">
               <span class="mono name">{openMeta.path}</span>
-              {#if !openMeta.binary}
+              {#if openConflicts}
+                <span class="muted">what lands in {pair.target.name}</span>
+              {:else if !openMeta.binary}
                 <span class="mono added">+{openMeta.added}</span>
                 <span class="mono deleted">−{openMeta.deleted}</span>
               {/if}
             </div>
             <div class="diffpane">
-              {#if diff}
-                <Diff {diff} path={openMeta.path} />
+              {#if openConflicts}
+                <!-- The file as git will write it, markers and all. -->
+                <Conflict
+                  text={preview?.result.conflicted?.[openMeta.path] ?? ''}
+                  targetName={pair.target.name}
+                  commit={selected}
+                />
+              {:else if diff}
+                <Diff {diff} path={openMeta.path} {hits} />
               {:else}
                 <p class="aside">Reading {openMeta.path}…</p>
               {/if}
@@ -237,100 +396,123 @@
         </span>
       </div>
 
-      {#if target}
-        <div class="facts">
-          <div class="kv">
-            <span>Working tree</span>
-            {#if clean}
-              <span class="ok"><span class="pip"></span>Clean</span>
-            {:else}
-              <span class="warn">
-                {target.dirty.length}
-                {target.dirty.length === 1 ? 'file changed' : 'files changed'}
-              </span>
-            {/if}
+      {#if phase === 'preview' && preview}
+        <PreviewPanel
+          {preview}
+          targetName={pair.target.name}
+          {busy}
+          onback={back}
+          onapply={apply}
+        />
+      {:else if phase === 'guard'}
+        <GuardPanel
+          {matches}
+          targetName={pair.target.name}
+          {skip}
+          excluded={files.filter((f) => f.excluded).map((f) => f.path)}
+          {busy}
+          onopen={show}
+          onuntick={untick}
+          onpreview={runPreview}
+        />
+      {:else}
+        {#if target}
+          <div class="facts">
+            <div class="kv">
+              <span>Working tree</span>
+              {#if clean}
+                <span class="ok"><span class="pip"></span>Clean</span>
+              {:else}
+                <span class="warn">
+                  {target.dirty.length}
+                  {target.dirty.length === 1 ? 'file changed' : 'files changed'}
+                </span>
+              {/if}
+            </div>
+            <div class="kv">
+              <span>Stands at</span>
+              {#if target.position.match}
+                <span><span class="mono">{target.position.match.slice(0, 7)}</span> · exact match</span>
+              {:else if target.position.nearest}
+                <span>
+                  <span class="mono">{target.position.nearest.slice(0, 7)}</span> · nearest,
+                  {target.position.divergent.length}
+                  {target.position.divergent.length === 1 ? 'file differs' : 'files differ'}
+                </span>
+              {:else}
+                <span class="muted">nowhere in this history</span>
+              {/if}
+            </div>
+            <div class="kv">
+              <span>Behind source</span>
+              <span>{behind} {behind === 1 ? 'commit' : 'commits'}</span>
+            </div>
+            <div class="kv">
+              <span>Never crosses</span>
+              <span>{pair.exclude.length} {pair.exclude.length === 1 ? 'pattern' : 'patterns'}</span>
+            </div>
+            <div class="kv last">
+              <span>Content guard</span>
+              <span>{pair.guard.length} {pair.guard.length === 1 ? 'pattern' : 'patterns'}</span>
+            </div>
           </div>
-          <div class="kv">
-            <span>Stands at</span>
-            {#if target.position.match}
-              <span><span class="mono">{target.position.match.slice(0, 7)}</span> · exact match</span>
-            {:else if target.position.nearest}
-              <span>
-                <span class="mono">{target.position.nearest.slice(0, 7)}</span> · nearest,
-                {target.position.divergent.length}
-                {target.position.divergent.length === 1 ? 'file differs' : 'files differ'}
-              </span>
-            {:else}
-              <span class="muted">nowhere in this history</span>
-            {/if}
-          </div>
-          <div class="kv">
-            <span>Behind source</span>
-            <span>{behind} {behind === 1 ? 'commit' : 'commits'}</span>
-          </div>
-          <div class="kv">
-            <span>Never crosses</span>
-            <span>{pair.exclude.length} {pair.exclude.length === 1 ? 'pattern' : 'patterns'}</span>
-          </div>
-          <div class="kv last">
-            <span>Content guard</span>
-            <span>{pair.guard.length} {pair.guard.length === 1 ? 'pattern' : 'patterns'}</span>
-          </div>
-        </div>
 
-        {#if theirs.length > 0}
-          <!-- Screen 4: the target has changes of its own. -->
-          <div class="blocked">
-            <span class="line warn"><Warning /> {pair.target.name} has uncommitted changes</span>
-            <ul class="changed">
-              {#each theirs as c (c.path)}
-                <li><span class="mono st">{c.status}</span><span class="mono">{c.path}</span></li>
-              {/each}
-            </ul>
-            <span class="muted">
-              Commit or discard them first, so two transfers cannot mix into one commit.
-              Untracked files don't count.
-            </span>
-          </div>
-        {:else if waiting}
-          <div class="blocked">
-            <span class="line ok-text">A transfer of floe's is waiting in {pair.target.name}.</span>
-            <span class="muted">
-              The staged and conflict screens are the next pass of area 5.
-            </span>
-          </div>
+          {#if theirs.length > 0}
+            <!-- Screen 4: the target has changes of its own. -->
+            <div class="blocked">
+              <span class="line warn"><Warning /> {pair.target.name} has uncommitted changes</span>
+              <ul class="changed">
+                {#each theirs as c (c.path)}
+                  <li><span class="mono st">{c.status}</span><span class="mono">{c.path}</span></li>
+                {/each}
+              </ul>
+              <span class="muted">
+                Commit or discard them first, so two transfers cannot mix into one commit.
+                Untracked files don't count.
+              </span>
+            </div>
+          {:else if waiting}
+            <div class="blocked">
+              <span class="line ok-text">A transfer of floe's is waiting in {pair.target.name}.</span>
+              <span class="muted">
+                The staged and conflict screens are the next pass of area 5.
+              </span>
+            </div>
+          {/if}
         {/if}
-      {/if}
 
-      <div class="spacer"></div>
+        <div class="spacer"></div>
 
-      <div class="actions">
-        <span class="muted says">
-          {#if !target}
-            Reading {pair.target.name}…
-          {:else if theirs.length > 0 || waiting}
-            Nothing will be transferred while {pair.target.name} has changes.
-          {:else if !detail}
-            Reading the commit…
-          {:else if files.length === 0}
-            This commit changes no file.
-          {:else if files.every((f) => f.excluded)}
-            Every file this commit changes is excluded from this pair.
-          {:else if crossing.length === 0}
-            Every file is unticked, so nothing would cross.
-          {:else}
-            {crossing.length}
-            {crossing.length === 1 ? 'file' : 'files'} will be staged in {pair.target.name}, with
-            this commit's message ready in your commit box. Nothing is committed.
-          {/if}
-        </span>
-        <div class="buttons">
-          {#if !clean}
-            <button class="ghost" type="button" onclick={recheck}>Check again</button>
-          {/if}
-          <button class="primary" type="button" disabled={!canPreview}>Preview transfer</button>
+        <div class="actions">
+          <span class="muted says">
+            {#if !target}
+              Reading {pair.target.name}…
+            {:else if theirs.length > 0 || waiting}
+              Nothing will be transferred while {pair.target.name} has changes.
+            {:else if !detail}
+              Reading the commit…
+            {:else if files.length === 0}
+              This commit changes no file.
+            {:else if files.every((f) => f.excluded)}
+              Every file this commit changes is excluded from this pair.
+            {:else if crossing.length === 0}
+              Every file is unticked, so nothing would cross.
+            {:else}
+              {crossing.length}
+              {crossing.length === 1 ? 'file' : 'files'} will be staged in {pair.target.name}, with
+              this commit's message ready in your commit box. Nothing is committed.
+            {/if}
+          </span>
+          <div class="buttons">
+            {#if !clean}
+              <button class="ghost" type="button" onclick={recheck}>Check again</button>
+            {/if}
+            <button class="primary" type="button" disabled={!canPreview} onclick={runPreview}>
+              {busy ? 'Previewing…' : 'Preview transfer'}
+            </button>
+          </div>
         </div>
-      </div>
+      {/if}
     </section>
   </div>
 </div>

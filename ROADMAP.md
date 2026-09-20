@@ -102,14 +102,21 @@ None.
    far: **screen 1, Pairs**, including a missing repository and an unreadable pair file;
    **screen 2, the main screen**, with the commit list and where the target stands, the
    crossing commit's files with unticking, and floe's own diff component over git's unified
-   output; and **screen 4**, the same screen with a target that has changes. Still to come:
-   preview, guard refusal, conflict, staged, the discard dialog, and pair settings with
-   area 6.
+   output; **screen 4**, the same screen with a target that has changes; **screen 5, the
+   preview**, with the checks that passed, what each crossing file will do, and a predicted
+   conflict shown as it will land; and **screen 6, refused by the guard**, with every match
+   over the line that matched, marked where the pattern hit, and `Untick this file` as the
+   way out that leaves the pair's settings alone. Screens 2, 4, 5 and 6 are one shell —
+   `screens/Main.svelte` — and a target column per phase. **Apply transfer** is wired: a
+   HEAD that moved is previewed again rather than applied stale. Still to come: conflict,
+   staged, the discard dialog, and pair settings with area 6.
 6. 🛠️ **Exclusions and content guard** — `internal/pair` reads and writes each pair's config
    and lists the remembered pairs; exclusions are matched and guard patterns compiled there.
    The guard also scans what a 3-way merge brings in. The API saves both lists and checks a
    pattern as it is typed, with floe's suggested fix. Still to come: the settings screen and
-   "never transfer" on a file row, with area 5.
+   "never transfer" on a file row, with area 5. Until the settings screen exists, screen 6's
+   **Edit guard** is disabled and says so: a pair's patterns are edited in its config file,
+   which floe re-reads on every request.
 7. ⏳ **Release** — GoReleaser, the cask, `README.md`.
 8. ⏸️ **Whole-tree comparison** — source HEAD against the target, beyond the per-commit
    nearest match.

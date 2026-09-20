@@ -4,6 +4,10 @@
    * through and labelled: a file that quietly vanished would be
    * indistinguishable from one the commit never touched. Individual files can
    * be unticked for a single transfer.
+   *
+   * A preview or a refusal replaces a row's line counts with what it found
+   * there: what the file will do when it lands, or that the guard matched in
+   * it.
    */
   import type { File } from './types'
 
@@ -11,6 +15,8 @@
     files,
     selected,
     skip,
+    tags = {},
+    locked = false,
     onselect,
     onskip,
   }: {
@@ -18,6 +24,14 @@
     selected: string
     /** Paths unticked for this transfer. */
     skip: string[]
+    /** By path: a result or a refusal, in place of the line counts. */
+    tags?: Record<string, Tag>
+    /*
+     * A preview is computed for the ticked files it was given, so unticking
+     * one would describe a transfer floe has not checked. Screen 6 leaves this
+     * off: unticking the file the guard matched in is the way out of it.
+     */
+    locked?: boolean
     onselect: (path: string) => void
     onskip: (path: string, crossing: boolean) => void
   } = $props()
@@ -42,7 +56,7 @@
       <button
         class="tick"
         type="button"
-        disabled={f.excluded}
+        disabled={f.excluded || locked}
         aria-label={f.excluded
           ? `${f.path} never crosses`
           : `${ticked ? 'Do not transfer' : 'Transfer'} ${f.path}`}
@@ -67,6 +81,8 @@
         <span class="mono path" class:struck={f.excluded}>{f.path}</span>
         {#if f.excluded}
           <span class="label">excluded</span>
+        {:else if tags[f.path]}
+          <span class="tag {tags[f.path]!.role}">{tags[f.path]!.text}</span>
         {:else if f.binary}
           <span class="label">binary</span>
         {:else}
@@ -79,6 +95,9 @@
 </div>
 
 <script lang="ts" module>
+  /** What a row says instead of its counts, in the colour of its meaning. */
+  export type Tag = { text: string; role: 'ok' | 'warn' | 'bad' }
+
   /** M amber, A green, D red — DESIGN.md's file row. */
   function statusRole(status: string): string {
     return status === 'A' ? 'add' : status === 'D' ? 'del' : 'mod'
@@ -191,6 +210,28 @@
   .label {
     flex-shrink: 0;
     font-size: var(--size-path);
+  }
+
+  .tag {
+    flex-shrink: 0;
+    font-size: var(--size-path);
+    padding: 1px 7px;
+    border-radius: 3px;
+  }
+
+  .tag.ok {
+    color: var(--accent);
+    background: rgba(111, 194, 180, 0.1);
+  }
+
+  .tag.warn {
+    color: var(--attention);
+    background: rgba(217, 179, 108, 0.12);
+  }
+
+  .tag.bad {
+    color: var(--refusal);
+    background: rgba(224, 130, 111, 0.12);
   }
 
   .added {

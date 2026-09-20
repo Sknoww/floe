@@ -47,6 +47,10 @@ The approved mockups are the design canvas "Floe Mockups" (claude.ai artifact
 | Diff delete | text `#e3b3b3` on `rgba(200,110,110,.12)`; counts `#d59090` | |
 | Hunk header | `#7f93b3` on `#1a1d23` | |
 | Line numbers | `#525862` | |
+| Conflict marker | `#d9b36c` on `rgba(217,179,108,.10)` | The marker lines themselves |
+| `ours` | `rgba(127,147,179,.10)`; label `#9fb0c9` | The target's side of a conflict |
+| `theirs` | `rgba(111,194,180,.09)`; label `#8fcfc4` | The commit's side |
+| Guard hit | text `#f0c2b8` on `rgba(224,130,111,.16)`, 2px `#e0826f` left edge; the matched text `#ffe2dc` on `rgba(224,130,111,.35)`; the line in a match block `#c9a39c` | |
 
 Tinted surfaces (tags, callouts) use their role colour at 8–12% alpha, with a 25–35% alpha
 border on a callout.
@@ -135,11 +139,18 @@ border on a callout.
    **Check again**.
 5. **Preview**. The checks that passed, then what happens to each crossing file (`staged`,
    `conflict`). A predicted conflict gets an amber callout, and the crossing column shows
-   that file as it will land. The footer names the HEAD it was checked against and says a
-   moved HEAD is previewed again. **Back** and **Apply transfer**.
+   that file as it will land. A binary file among those crossing is named under the checks,
+   since the guard reads lines and has none to read there. The crossing eyebrow reads
+   `Crossing · preview`, each file row's counts give way to what it will do (`merges
+   cleanly`, `will conflict`), and no row can be unticked: the preview describes the files
+   it was given. The footer names the HEAD it was checked against and says a moved HEAD is
+   previewed again. **Back** and **Apply transfer**, the one primary, at twice Back's
+   width.
 6. **Refused by the guard**. A coral callout that says the target is untouched, then each
    match from the check that refused. Files with a match are tagged `guard` in the file
-   list. **Edit guard** and **Preview again**.
+   list, and the match's path opens that file in the crossing column. Neither way out is
+   the one floe recommends, so the footer has no primary: **Edit guard** and
+   **Preview again**.
 7. **Conflict**. An amber callout, the conflicted files first and then the staged ones,
    and one sentence on what to do next. The crossing column shows the file with its
    markers. **Open in editor** (primary) and **Discard transfer**.
@@ -166,9 +177,10 @@ text editor where VS Code is not installed (see `CONTEXT.md`).
 
 ## Not yet designed
 
-- A HEAD that moved since the preview (floe previews again), git refusing a patch (its
-  message shown in the target panel), and a binary file in a preview (named there, since
-  the guard cannot scan it).
+- git refusing a patch: its message is shown in the target panel. Until then floe shows
+  git's own words in the page's banner.
+- A HEAD that moved since the preview has no drawing of its own: floe says so in the
+  banner, in its own words, and previews again on the spot.
 - **Never transfer** on a file row (area 6).
 - A long history: windowing the commit list and what the source column shows when the
   target's position is far down it.

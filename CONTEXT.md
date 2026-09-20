@@ -163,6 +163,10 @@ box from it (`getInputTemplate` in `extensions/git/src/repository.ts`, which pre
 A conflict stops with markers in the working tree and unmerged entries in the index. Floe
 offers open-in-editor or abort, which the UI calls **Discard transfer**.
 
+The preview screen is where the user confirms, so what it draws is what it was given: the
+conflict text floe rebuilt, not a re-merge in the page. The page's own conflict parser only
+sides and numbers the lines git already wrote.
+
 **Open in editor** launches VS Code on the target repository, at the conflicted file: VS
 Code's commit box picks up the carried `SQUASH_MSG` and it has conflict tooling. Where VS
 Code is not installed, the file opens in the system's default text editor. On macOS the
@@ -286,7 +290,7 @@ release build has no such origin and an OS-chosen port.
 | Area | Decision |
 |---|---|
 | Language | Go, one binary. Module `github.com/Sknoww/floe`, binary `floe`. The `go.mod` floor tracks the minimum the code needs, never bumped just because a newer toolchain is installed |
-| Layout | `main.go` at the root. `internal/git` shells out and parses; `internal/pair` owns pair config and remembered pairs; `internal/transfer` orders the checks, import, preview, apply and position computation; `internal/server` is HTTP, the token and the JSON API; `internal/gittest` makes the throwaway repositories the tests run against. `web/` is the frontend: `src/lib` is what every screen shares (the typed API client, the session, small helpers, icons), `src/screens` is one file per screen in `DESIGN.md`, and `src/app.css` holds the foundations — nothing else declares a colour or a size |
+| Layout | `main.go` at the root. `internal/git` shells out and parses; `internal/pair` owns pair config and remembered pairs; `internal/transfer` orders the checks, import, preview, apply and position computation; `internal/server` is HTTP, the token and the JSON API; `internal/gittest` makes the throwaway repositories the tests run against. `web/` is the frontend: `src/lib` is what every screen shares (the typed API client, the session, small helpers, icons), `src/screens` is one file per screen in `DESIGN.md`, and `src/app.css` holds the foundations — nothing else declares a colour or a size. Screens 2, 4, 5 and 6 are the same three-column shell, so `screens/Main.svelte` owns it and the phase it is in, and each of the others is the target column that phase puts in it: the column holding the target's state and every action that writes to it is the whole of what they change |
 | Frontend | **Svelte 5 + TypeScript, built with Vite.** Not SvelteKit: the Go server owns routing and the API, and the UI is one embedded page. Node is a build-time dependency only; binary size is not a constraint. There is no router: one pair is open at a time, and which one lives in the URL fragment beside the token, so a reload lands back on it. TypeScript is held at 6.x, which is the newest `svelte-check` declares |
 | Styling | Plain CSS with custom properties, scoped per component; the values come from `DESIGN.md`. No component library — the mockups decide the look. The design's one dialog (the discard confirmation) and one menu (the pair switcher) are **hand-rolled, with no primitives library**: a native `<dialog>` opened with `showModal()` already gives the focus trap, Esc and `::backdrop`, and one menu does not earn a dependency |
 | Diff rendering | Our own component over git's unified output, so it follows `DESIGN.md`. Binary files render as a named placeholder. Syntax highlighting is deferred; Shiki is the candidate |
