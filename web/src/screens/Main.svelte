@@ -53,7 +53,18 @@
     pair,
     home,
     onpairs,
-  }: { api: Api; pair: Pair; home: string | undefined; onpairs: () => void } = $props()
+    onsettings,
+    onpair,
+  }: {
+    api: Api
+    pair: Pair
+    home: string | undefined
+    onpairs: () => void
+    /** Screen 3, from the counts that say how many patterns there are. */
+    onsettings: () => void
+    /** The pair as the config file now has it, when a re-read finds it moved. */
+    onpair: (p: Pair) => void
+  } = $props()
 
   let branch = $state('')
   let commits = $state<Commit[]>([])
@@ -389,9 +400,21 @@
     setSkip(path, false)
   }
 
+  /*
+   * The target, and the pair's own patterns beside it: floe re-reads the
+   * config file on every request, so a hand edit applies at once on the server
+   * and the counts on this screen would otherwise say something else. Patterns
+   * that moved change what crosses, so the commit is read again too.
+   */
   async function recheck() {
     try {
-      target = await api.target(pair.id)
+      const [state, fresh] = await Promise.all([api.target(pair.id), api.pair(pair.id)])
+      target = state
+      const moved = !same(fresh.exclude, pair.exclude) || !same(fresh.guard, pair.guard)
+      onpair(fresh)
+      // Not while a transfer waits: its files are the ones it carried, and
+      // reselecting would drop what it left out.
+      if (moved && selected && !waiting) await select(selected)
     } catch (e) {
       failure = message(e)
     }
@@ -584,6 +607,7 @@
           {busy}
           onopen={show}
           onuntick={untick}
+          onguard={onsettings}
           onpreview={runPreview}
         />
       {:else}
@@ -618,14 +642,15 @@
               <span>Behind source</span>
               <span>{behind} {behind === 1 ? 'commit' : 'commits'}</span>
             </div>
-            <div class="kv">
+            <!-- The counts are the way in to the patterns behind them. -->
+            <button class="kv link" type="button" onclick={onsettings}>
               <span>Never crosses</span>
               <span>{pair.exclude.length} {pair.exclude.length === 1 ? 'pattern' : 'patterns'}</span>
-            </div>
-            <div class="kv last">
+            </button>
+            <button class="kv link last" type="button" onclick={onsettings}>
               <span>Content guard</span>
               <span>{pair.guard.length} {pair.guard.length === 1 ? 'pattern' : 'patterns'}</span>
-            </div>
+            </button>
           </div>
 
           {#if theirs.length > 0}
@@ -693,6 +718,11 @@
 />
 
 <script lang="ts" module>
+  /** Two pattern lists, as the config file orders them. */
+  function same(a: string[], b: string[]): boolean {
+    return a.length === b.length && a.every((p, i) => p === b[i])
+  }
+
   /** A commit message past its subject line. */
   function body(message: string): string {
     const cut = message.indexOf('\n')
@@ -866,6 +896,22 @@
 
   .kv.last {
     border-bottom: none;
+  }
+
+  /* A row that leads somewhere, drawn as the rows around it. */
+  .kv.link {
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .kv.link:hover > span:last-child {
+    color: var(--accent);
   }
 
   .kv > span:first-child {

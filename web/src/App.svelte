@@ -9,6 +9,7 @@
   import Blocked from './lib/icons/Blocked.svelte'
   import MainScreen from './screens/Main.svelte'
   import PairsScreen from './screens/Pairs.svelte'
+  import SettingsScreen from './screens/Settings.svelte'
   import TopBar from './lib/TopBar.svelte'
   import type { Pair, Pairs } from './lib/types'
 
@@ -17,6 +18,12 @@
 
   let pairs = $state<Pairs | undefined>(undefined)
   let open = $state<Pair | undefined>(undefined)
+  /*
+   * Screen 3 sits in front of the open pair rather than beside it: its
+   * patterns decide what crosses, so leaving it puts the transfer screens back
+   * with the pair as it now stands.
+   */
+  let settings = $state(false)
   let failure = $state<string>('')
 
   // The token reaches the page in the fragment; without it every API request
@@ -39,6 +46,7 @@
   async function openPair(id: string) {
     try {
       open = await api.open(id)
+      settings = false
       writePair(id)
     } catch (e) {
       // A pair floe cannot open is not a dead end: the list still stands.
@@ -50,6 +58,7 @@
 
   function toPairs() {
     open = undefined
+    settings = false
     failure = ''
     writePair('')
     void refresh()
@@ -68,8 +77,26 @@
   }
 </script>
 
-{#if open}
-  <MainScreen {api} pair={open} home={pairs?.home} onpairs={toPairs} />
+{#if open && settings}
+  <SettingsScreen
+    {api}
+    pair={open}
+    home={pairs?.home}
+    onback={() => (settings = false)}
+    onsaved={(saved) => {
+      open = saved
+      settings = false
+    }}
+  />
+{:else if open}
+  <MainScreen
+    {api}
+    pair={open}
+    home={pairs?.home}
+    onpairs={toPairs}
+    onsettings={() => (settings = true)}
+    onpair={(fresh) => (open = fresh)}
+  />
 {:else if pairs}
   {#if failure}
     <div class="banner">

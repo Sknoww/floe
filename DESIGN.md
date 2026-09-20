@@ -134,12 +134,18 @@ border on a callout.
    where it stands, how far behind the source it is, and the exclusion and guard counts.
    The sentence above **Preview transfer** says what will happen: how many files are
    staged, that the message is carried, that nothing is committed.
-3. **Pair settings**, from the pair name or the target panel's counts. Two sections,
-   `Never crosses` and `Content guard`, each with one line on how its patterns match.
+3. **Pair settings**, from the target panel's counts, and from **Edit guard** on screen 6.
+   Two sections, `Never crosses` and `Content guard`, each with one line on how its
+   patterns match, its patterns as rows that can be removed, and a field to add one.
    - An invalid pattern is refused as it is added, with floe's own message in coral and
-     its suggested fix (`Use docs/**`) one click away.
-   - The guard input offers **Match literally**, which escapes what is typed.
-   - Changes are kept only on **Save**; **Discard changes** drops them.
+     its suggested fix (`Use docs/**`) one click away. Every pattern is checked over the
+     API as it is typed: floe is the only thing that can say whether one is valid.
+   - The guard input offers **Match literally**, which escapes what is typed; the escaped
+     pattern is shown under the field, since it is not what was typed.
+   - A pattern the list already has says so rather than adding a second one.
+   - Changes are kept only on **Save**; **Discard changes** drops them. The file's path is
+     under the title: a hand edit is as valid as this screen, so the screen reads the file
+     again when it opens rather than trusting the screen behind it.
 4. **Target has changes**. The target panel lists the changed tracked files in amber and
    says to commit or discard them first; untracked files don't count. **Preview transfer**
    is disabled. Floe checks the target again when its window regains focus, and on
@@ -156,13 +162,15 @@ border on a callout.
 6. **Refused by the guard**. A coral callout that says the target is untouched, then each
    match from the check that refused. Files with a match are tagged `guard` in the file
    list, and the match's path opens that file in the crossing column. Neither way out is
-   the one floe recommends, so the footer has no primary: **Edit guard** and
-   **Preview again**.
+   the one floe recommends, so the footer has no primary: **Edit guard**, which is screen
+   3, and **Preview again**.
 7. **Conflict**. An amber callout, the conflicted files first and then the staged ones,
    and one sentence on what to do next. The crossing column shows the file with its
-   markers. **Open in editor** (primary) and **Discard transfer**.
+   markers, read out of the target's working tree. **Open in editor** (primary, since
+   resolving is what floe recommends) and **Discard transfer**.
 8. **Staged**. A teal callout, the message exactly as it waits in the commit box, and
-   "Floe never commits." **Open in editor** and **Discard transfer**.
+   "Floe never commits." No primary — the transfer is done, and committing happens
+   elsewhere: **Open in editor** and **Discard transfer**.
 9. **Discard**. One confirmation for the conflict and the staged screens, since it is one
    operation: where the target goes back to, that every change to tracked files is
    discarded (conflict resolutions included), that untracked files stay, that the carried
@@ -188,7 +196,8 @@ text editor where VS Code is not installed (see `CONTEXT.md`).
   git's own words in the page's banner.
 - A HEAD that moved since the preview has no drawing of its own: floe says so in the
   banner, in its own words, and previews again on the spot.
-- **Never transfer** on a file row (area 6).
+- **Never transfer** on a file row: a shortcut for adding that path to `Never crosses`,
+  which screen 3 already does the long way.
 - A long history: windowing the commit list and what the source column shows when the
   target's position is far down it.
 - Keyboard navigation.

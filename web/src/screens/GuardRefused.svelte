@@ -19,6 +19,7 @@
     busy,
     onopen,
     onuntick,
+    onguard,
     onpreview,
   }: {
     matches: Match[]
@@ -31,6 +32,8 @@
     /** Shows the matched file in the crossing column. */
     onopen: (path: string) => void
     onuntick: (path: string) => void
+    /** The pair's settings, where its guard patterns are. */
+    onguard: () => void
     onpreview: () => void
   } = $props()
 
@@ -79,19 +82,7 @@
 <div class="spacer"></div>
 
 <div class="actions">
-  <!--
-    Editing the guard means the pair settings screen, which arrives with
-    area 6. Until it does the button keeps its place and says why it cannot be
-    used, rather than leading nowhere.
-  -->
-  <button
-    class="ghost"
-    type="button"
-    disabled
-    title="Pair settings arrive with area 6. Until then, edit the pair's guard patterns in its config file."
-  >
-    Edit guard
-  </button>
+  <button class="ghost" type="button" onclick={onguard}>Edit guard</button>
   <button class="ghost" type="button" onclick={onpreview} disabled={busy}>
     {busy ? 'Previewing…' : 'Preview again'}
   </button>

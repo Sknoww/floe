@@ -49,7 +49,9 @@ from every transfer.
   count is the nearest, and the remainder is shown as divergence. No position state is
   written into either repository.
 - **Configuration lives outside both repositories**, per source/target pair, in the user's
-  config directory: exclusions and content-guard patterns.
+  config directory: exclusions and content-guard patterns. Floe re-reads the file on every
+  request, so a hand edit is as valid as the settings screen — and the page re-reads it too,
+  rather than saving a copy taken when the pair was opened.
 - **Content guard.** A transfer is refused when the patch's added lines, the source commit's
   message, or any line the 3-way merge brings into a file match the pair's patterns — a
   conflict's source side, or a merge driver, can carry lines the patch has only as context.
@@ -99,7 +101,7 @@ None.
    letters, the carried message, and a conflict as it will land. A transfer floe applies is
    recorded, so Discard survives a restart and is never offered over the user's own work.
    `web/embed.go` embeds a placeholder until area 5 builds the frontend.
-5. 🛠️ **UI** — the screens from area 2, against the API. `web/` is a Vite project building
+5. ✅ **UI** — the screens from area 2, against the API. `web/` is a Vite project building
    Svelte 5 + TypeScript into the `dist/` the binary embeds, with the foundations from
    `DESIGN.md` as custom properties in `src/app.css`, the fonts self-hosted, a typed client
    over the whole API, and the token and open pair read from the URL fragment. The dev loop
@@ -119,14 +121,15 @@ None.
    that says what each one did, the commit list pinned to the transfer, the conflicted file
    read back out of the target's working tree, and **Open in editor** over
    `internal/editor`; and **screen 9, the discard confirmation**, the one dialog, on a
-   native `<dialog>`. Still to come: pair settings with area 6.
+   native `<dialog>`. Last, **screen 3, pair settings**, reached from the target panel's
+   counts and from screen 6's **Edit guard**, with every pattern checked over the API as it
+   is typed. All nine screens of area 2 are built.
 6. 🛠️ **Exclusions and content guard** — `internal/pair` reads and writes each pair's config
    and lists the remembered pairs; exclusions are matched and guard patterns compiled there.
    The guard also scans what a 3-way merge brings in. The API saves both lists and checks a
-   pattern as it is typed, with floe's suggested fix. Still to come: the settings screen and
-   "never transfer" on a file row, with area 5. Until the settings screen exists, screen 6's
-   **Edit guard** is disabled and says so: a pair's patterns are edited in its config file,
-   which floe re-reads on every request.
+   pattern as it is typed, with floe's suggested fix, and screen 3 is that screen. What is
+   left is **"never transfer" on a file row** — a shortcut for what screen 3 already does
+   the long way, and undrawn: it needs a design decision before it is built.
 7. ⏳ **Release** — GoReleaser, the cask, `README.md`.
 8. ⏸️ **Whole-tree comparison** — source HEAD against the target, beyond the per-commit
    nearest match.

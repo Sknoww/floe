@@ -354,6 +354,12 @@ release build has no such origin and an OS-chosen port.
 - `guard` — Go (RE2) regular expressions, case-sensitive unless `(?i)`. The UI can offer
   "match literally" by escaping what the user types. An empty pattern would refuse every
   transfer and is an error.
+- **The page never assumes the config file is what it last saw.** Floe re-reads it on every
+  request, so a hand edit applies at once on the server; the page would otherwise show
+  counts, and save lists, from a copy taken when the pair was opened. So the settings screen
+  reads the pair again when it opens, and the main screen re-reads it whenever it re-checks
+  the target — which is when its window regains focus, the moment a hand edit would have
+  happened. Patterns that moved change what crosses, so the open commit is read again too.
 - Floe writes the file (edits from the UI, `lastOpened`) atomically, via a temp file and
   rename. Hand edits are fine. An unknown field or an invalid pattern is an **error naming
   the file and the field**, never ignored: a setting that silently didn't apply is
