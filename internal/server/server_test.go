@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"reflect"
 	"slices"
 	"strings"
@@ -197,11 +198,16 @@ func TestPairsAndSettings(t *testing.T) {
 	h := launch(t, root)
 
 	var list struct {
+		Home  string           `json:"home"`
 		Pairs []rememberedJSON `json:"pairs"`
 	}
 	h.call("GET", "/api/pairs", nil, http.StatusOK, &list)
 	if len(list.Pairs) != 1 || list.Pairs[0].ID != id || list.Pairs[0].Source == nil || list.Pairs[0].Source.Path != src {
 		t.Errorf("pairs = %+v", list.Pairs)
+	}
+	// The page needs the home directory to abbreviate a path to "~/…".
+	if home, err := os.UserHomeDir(); err == nil && list.Home != home {
+		t.Errorf("home = %q, want %q", list.Home, home)
 	}
 
 	var p pairJSON

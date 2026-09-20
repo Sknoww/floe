@@ -69,6 +69,9 @@ from every transfer.
 - **A target with no commits is supported**: its first transfer is the one that gives it a
   history.
 - **git 2.32.0 or newer**, checked when a pair is opened.
+- **The page is one screen at a time, with no router.** Which pair is open lives in the URL
+  fragment beside the token, so reloading lands back where you were. Fonts are self-hosted
+  and embedded; the one dialog and one menu are hand-rolled rather than a primitives library.
 
 ## Open questions
 
@@ -91,8 +94,14 @@ None.
    letters, the carried message, and a conflict as it will land. A transfer floe applies is
    recorded, so Discard survives a restart and is never offered over the user's own work.
    `web/embed.go` embeds a placeholder until area 5 builds the frontend.
-5. ⏳ **UI** — the screens from area 2, against the API. Starts with `web/`'s Vite project and
-   the dev loop the `dev` build tag expects.
+5. 🛠️ **UI** — the screens from area 2, against the API. `web/` is a Vite project building
+   Svelte 5 + TypeScript into the `dist/` the binary embeds, with the foundations from
+   `DESIGN.md` as custom properties in `src/app.css`, the fonts self-hosted, a typed client
+   over the whole API, and the token and open pair read from the URL fragment. The dev loop
+   is live: `npm run dev` proxies `/api` to a `dev`-tagged floe, with hot reload. **Screen 1,
+   Pairs**, is built, including a missing repository and an unreadable pair file. Still to
+   come: the main screen and its diff component, then preview, guard refusal, conflict,
+   staged, the discard dialog, and pair settings with area 6.
 6. 🛠️ **Exclusions and content guard** — `internal/pair` reads and writes each pair's config
    and lists the remembered pairs; exclusions are matched and guard patterns compiled there.
    The guard also scans what a 3-way merge brings in. The API saves both lists and checks a

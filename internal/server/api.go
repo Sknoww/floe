@@ -88,9 +88,13 @@ func (s *Server) listPairs(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, j)
 	}
+	// The page abbreviates a path under the home directory to "~/…", which it
+	// cannot know on its own. An unreadable home is simply not sent.
+	home, _ := os.UserHomeDir()
 	writeJSON(w, http.StatusOK, struct {
+		Home  string           `json:"home,omitempty"`
 		Pairs []rememberedJSON `json:"pairs"`
-	}{out})
+	}{home, out})
 }
 
 func (s *Server) getPair(w http.ResponseWriter, r *http.Request) {

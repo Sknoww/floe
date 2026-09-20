@@ -229,7 +229,7 @@ applies at once; the repositories are opened once a launch.
 
 | Route | |
 |---|---|
-| `GET /api/pairs` | Remembered pairs. A missing repository or a broken file stays listed, with why |
+| `GET /api/pairs` | Remembered pairs. A missing repository or a broken file stays listed, with why. `home` is the user's home directory, which the page needs to abbreviate a path to `~/…` and cannot know on its own |
 | `GET /api/pairs/{pair}` | Names, paths, the config file, and both pattern lists |
 | `POST /api/pairs/{pair}/open` | Opens the repositories and records `lastOpened` |
 | `PUT /api/pairs/{pair}/settings` | Replaces `exclude` and `guard`; nothing is saved unless every pattern is valid |
@@ -274,6 +274,11 @@ Built with the `dev` tag, floe listens on `127.0.0.1:5174`, also answers the Vit
 origin `http://localhost:5173` — which proxies `/api` to it — and opens the page there. A
 release build has no such origin and an OS-chosen port.
 
+- `npm run dev` in `web/` serves the page on 5173 with hot reload, `strictPort` so it is that
+  port or nothing, and `server.proxy` sending `/api` to `127.0.0.1:5174`. `changeOrigin` is
+  left off: the `Host` reaches floe as `localhost:5173`, which a dev build answers beside its
+  own address, and the `Origin` is the one it accepts.
+
 ---
 
 ## Architecture decisions
@@ -281,14 +286,14 @@ release build has no such origin and an OS-chosen port.
 | Area | Decision |
 |---|---|
 | Language | Go, one binary. Module `github.com/Sknoww/floe`, binary `floe`. The `go.mod` floor tracks the minimum the code needs, never bumped just because a newer toolchain is installed |
-| Layout | `main.go` at the root. `internal/git` shells out and parses; `internal/pair` owns pair config and remembered pairs; `internal/transfer` orders the checks, import, preview, apply and position computation; `internal/server` is HTTP, the token and the JSON API; `internal/gittest` makes the throwaway repositories the tests run against. `web/` is the frontend |
-| Frontend | **Svelte 5 + TypeScript, built with Vite.** Not SvelteKit: the Go server owns routing and the API, and the UI is one embedded page. Node is a build-time dependency only; binary size is not a constraint |
-| Styling | Plain CSS with custom properties, scoped per component; the values come from `DESIGN.md`. No component library — the mockups decide the look. The design needs one dialog (the discard confirmation) and one menu (the pair switcher); unstyled primitives are considered in area 5 for them |
+| Layout | `main.go` at the root. `internal/git` shells out and parses; `internal/pair` owns pair config and remembered pairs; `internal/transfer` orders the checks, import, preview, apply and position computation; `internal/server` is HTTP, the token and the JSON API; `internal/gittest` makes the throwaway repositories the tests run against. `web/` is the frontend: `src/lib` is what every screen shares (the typed API client, the session, small helpers, icons), `src/screens` is one file per screen in `DESIGN.md`, and `src/app.css` holds the foundations — nothing else declares a colour or a size |
+| Frontend | **Svelte 5 + TypeScript, built with Vite.** Not SvelteKit: the Go server owns routing and the API, and the UI is one embedded page. Node is a build-time dependency only; binary size is not a constraint. There is no router: one pair is open at a time, and which one lives in the URL fragment beside the token, so a reload lands back on it. TypeScript is held at 6.x, which is the newest `svelte-check` declares |
+| Styling | Plain CSS with custom properties, scoped per component; the values come from `DESIGN.md`. No component library — the mockups decide the look. The design's one dialog (the discard confirmation) and one menu (the pair switcher) are **hand-rolled, with no primitives library**: a native `<dialog>` opened with `showModal()` already gives the focus trap, Esc and `::backdrop`, and one menu does not earn a dependency |
 | Diff rendering | Our own component over git's unified output, so it follows `DESIGN.md`. Binary files render as a named placeholder. Syntax highlighting is deferred; Shiki is the candidate |
-| Embedding | `web/embed.go` embeds `all:dist`. `web/dist/` is build output, ignored except a placeholder so `go build` works before the first frontend build |
-| Dev loop | The Vite dev server proxies `/api` to `floe` built with the `dev` tag, which accepts the Vite origin (see [Dev loop](#dev-loop)). A release binary never does |
+| Embedding | `web/embed.go` embeds `all:dist`. `web/dist/` is build output, ignored except a placeholder so `go build` works before the first frontend build, which the Vite build writes back after emptying the directory. IBM Plex Sans and JetBrains Mono are self-hosted through `@fontsource` — a build-time dependency, latin subsets only, in the weights `DESIGN.md` names — so Vite hashes the woff2 into `dist/` and the page fetches nothing at runtime |
+| Dev loop | The Vite dev server proxies `/api` to `floe` built with the `dev` tag, which accepts the Vite origin (see [Dev loop](#dev-loop)). A release binary never does. `npm run dev`, `npm run build`, `npm run check` (svelte-check) and `npm test` (Vitest) in `web/` |
 | Git access | Shell out via `os/exec`, as drift does; no git library. Every call takes a `context.Context`, reads `-z` output where git offers it, and runs with `LC_ALL=C`. Read-only calls set `GIT_OPTIONAL_LOCKS=0`, so floe's refreshes never contend with the editor's git for the index lock. **git 2.32.0 or newer**, checked when a pair is opened: the release in which `apply --3way` tries the merge first and accepts `--cached`, which the preview needs. Object ids reaching the git layer must be full hex ids, so none can be read as an option |
-| Testing | Real throwaway repositories, never mocks, and every pair has unrelated histories. Hermetic as drift's suite is: `TestMain` sets `GIT_CONFIG_NOSYSTEM=1` and `GIT_CONFIG_GLOBAL=/dev/null`, and identity and initial branch are declared per repository. Frontend logic (diff parsing) is tested with Vitest |
+| Testing | Real throwaway repositories, never mocks, and every pair has unrelated histories. Hermetic as drift's suite is: `TestMain` sets `GIT_CONFIG_NOSYSTEM=1` and `GIT_CONFIG_GLOBAL=/dev/null`, and identity and initial branch are declared per repository. Frontend **logic** is tested with Vitest — the helpers and, when it arrives, diff parsing — not the components: the mockups are what the screens are checked against |
 | CI | Go tests plus the frontend build and tests on every push and pull request. Push, wait for green on the exact commit, then tag |
 | Distribution | GoReleaser on a tag: the frontend is built first (`npm ci && npm run build` in `web/`), then darwin/linux × amd64/arm64, a GitHub release, and a cask pushed to `Sknoww/homebrew-tap` with a `postflight` that strips quarantine. `main.version` is stamped via ldflags. The tap token is checked before anything is published |
 | Build target | macOS primary; Linux supported |

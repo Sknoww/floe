@@ -9,5 +9,9 @@
 /web/dist/*
 !/web/dist/.gitkeep
 
+# The frontend's dependencies. package-lock.json is committed: the release
+# build installs from it with `npm ci`.
+/web/node_modules/
+
 # The assembled design canvas, rebuilt from the .dc.html sources beside it.
 /design/mockups/floe-mockups.html

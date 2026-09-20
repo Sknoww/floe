@@ -1,0 +1,113 @@
+/*
+ * floe's foundations: the colour, type and layout values from DESIGN.md, and
+ * nothing else. Components own their own CSS, scoped by Svelte.
+ *
+ * The fonts are self-hosted through @fontsource, so the page fetches nothing
+ * at runtime: Vite hashes the woff2 into dist/, which the binary embeds.
+ */
+@import '@fontsource/ibm-plex-sans/latin-400.css';
+@import '@fontsource/ibm-plex-sans/latin-500.css';
+@import '@fontsource/ibm-plex-sans/latin-600.css';
+@import '@fontsource/jetbrains-mono/latin-400.css';
+@import '@fontsource/jetbrains-mono/latin-500.css';
+@import '@fontsource/jetbrains-mono/latin-700.css';
+
+:root {
+  /* Surfaces */
+  --ground: #15171b;
+  --bar: #121418;
+  --raised: #1a1d22;
+  --selected: #1f232a;
+  --border: #262a31;
+  --border-inner: #22262c;
+  --control: #2f343c;
+
+  /* Text */
+  --text: #d4d7dd;
+  --text-bright: #eef0f3;
+  --text-muted: #7b828c;
+  --text-faint: #6c737e;
+  --text-dim: #666c75;
+
+  /* Colour is meaning: teal points or reassures, amber needs you, coral
+     refuses or destroys. */
+  --accent: #6fc2b4;
+  --accent-line: #3a6f67;
+  --attention: #d9b36c;
+  --refusal: #e0826f;
+
+  /* Diff, muted: a screen full of change is the normal case. */
+  --add-text: #b9dcbf;
+  --add-bg: rgba(111, 170, 120, 0.12);
+  --add-count: #8fc59a;
+  --del-text: #e3b3b3;
+  --del-bg: rgba(200, 110, 110, 0.12);
+  --del-count: #d59090;
+  --hunk: #7f93b3;
+  --hunk-bg: #1a1d23;
+  --line-number: #525862;
+
+  /* Type: IBM Plex Sans for the interface, JetBrains Mono for everything git
+     produced. */
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+  --size-base: 13px;
+  --size-mono: 12px;
+  --size-path: 11px;
+  --size-name: 16px;
+  --size-subject: 17px;
+  --size-title: 22px;
+
+  /* Layout */
+  --bar-height: 48px;
+  --column-source: 340px;
+  --column-target: 300px;
+  --row-commit: 40px;
+  --row-file: 30px;
+  --row-diff: 20px;
+  --radius: 5px;
+
+  color-scheme: dark; /* dark only: there is no light theme and no setting */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--size-base);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  height: 100%;
+}
+
+/* Everything git produced: ids, paths, patterns, diffs, commands. */
+.mono {
+  font-family: var(--font-mono);
+  font-size: var(--size-mono);
+}
+
+/* 11px, uppercase, tracked, faint. */
+.eyebrow {
+  font-size: var(--size-path);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-faint);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
