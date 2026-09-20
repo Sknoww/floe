@@ -68,6 +68,19 @@ func (r *Repo) Head(ctx context.Context) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
+// Branch is the branch HEAD is on, also before its first commit, or "" when
+// HEAD is detached.
+func (r *Repo) Branch(ctx context.Context) (string, error) {
+	out, err := r.run(ctx, call{args: []string{"symbolic-ref", "--short", "-q", "HEAD"}})
+	if exitCode(err) == 1 {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
 // EmptyTree is the id of the empty tree in this repository's object format,
 // asked of git rather than hardcoded so SHA-256 repositories work. It is what a
 // root commit is diffed against. Nothing is written.
@@ -90,6 +103,10 @@ func checkID(id string) error {
 	}
 	return nil
 }
+
+// IsObjectID reports whether id is a full object id, as every id reaching this
+// package must be.
+func IsObjectID(id string) bool { return objectID.MatchString(id) }
 
 // isZeroID reports whether id is git's all-zeros id: the old side of an added
 // file, the new side of a deleted one.

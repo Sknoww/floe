@@ -61,8 +61,9 @@ func (e Excluded) has(path string) bool { return e != nil && e(path) }
 // File is one path a source commit changed.
 type File struct {
 	git.Change
-	Excluded bool // matches the pair's exclusions: never transferred
-	Skipped  bool // unticked for this transfer only
+	Lines    git.LineCount // the lines the commit added and deleted
+	Excluded bool          // matches the pair's exclusions: never transferred
+	Skipped  bool          // unticked for this transfer only
 }
 
 // Files lists the paths a source commit changed. Excluded paths are listed and
@@ -72,9 +73,13 @@ func (p *Pair) Files(ctx context.Context, commit string, excluded Excluded) ([]F
 	if err != nil {
 		return nil, err
 	}
+	counts, err := p.Source.LineCounts(ctx, commit)
+	if err != nil {
+		return nil, err
+	}
 	files := make([]File, len(changes))
 	for i, c := range changes {
-		files[i] = File{Change: c, Excluded: excluded.has(c.Path)}
+		files[i] = File{Change: c, Lines: counts[c.Path], Excluded: excluded.has(c.Path)}
 	}
 	return files, nil
 }
@@ -254,10 +259,13 @@ func (p *Pair) Abort(ctx context.Context) error {
 
 // TargetState is where the target stands between transfers.
 type TargetState struct {
-	Head      string   // "" for a target with no commits
-	Dirty     []string // tracked paths with changes: a staged transfer, or other work
-	Conflicts []string // paths left with conflict markers
-	Message   bool     // a carried message waits in SQUASH_MSG
+	Head      string           // "" for a target with no commits
+	Branch    string           // "" when HEAD is detached
+	Dirty     []git.FileStatus // tracked paths with changes: a staged transfer, or other work
+	Conflicts []string         // paths left with conflict markers
+	// Message is the carried message waiting in SQUASH_MSG, when HasMessage.
+	Message    string
+	HasMessage bool
 }
 
 // State reads the target's state, removing a stale SQUASH_MSG on the way.
@@ -266,7 +274,11 @@ func (p *Pair) State(ctx context.Context) (*TargetState, error) {
 	if err != nil {
 		return nil, err
 	}
-	dirty, err := p.Target.Dirty(ctx)
+	branch, err := p.Target.Branch(ctx)
+	if err != nil {
+		return nil, err
+	}
+	dirty, err := p.Target.Status(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -279,11 +291,18 @@ func (p *Pair) State(ctx context.Context) (*TargetState, error) {
 			return nil, err
 		}
 	}
-	message, err := p.Target.HasSquashMsg(ctx)
+	message, has, err := p.Target.SquashMsg(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return &TargetState{Head: head, Dirty: dirty, Conflicts: conflicts, Message: message}, nil
+	return &TargetState{
+		Head:       head,
+		Branch:     branch,
+		Dirty:      dirty,
+		Conflicts:  conflicts,
+		Message:    message,
+		HasMessage: has,
+	}, nil
 }
 
 // cleanTarget refuses a target with changes to tracked files and returns its

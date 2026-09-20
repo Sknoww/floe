@@ -4,5 +4,10 @@
 # GoReleaser build output.
 /dist
 
+# The frontend's build output, embedded in the binary. The placeholder keeps
+# `go build` working before the first frontend build.
+/web/dist/*
+!/web/dist/.gitkeep
+
 # The assembled design canvas, rebuilt from the .dc.html sources beside it.
 /design/mockups/floe-mockups.html

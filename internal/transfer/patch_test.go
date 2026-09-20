@@ -1,9 +1,12 @@
 package transfer
 
 import (
+	"reflect"
 	"regexp"
 	"slices"
 	"testing"
+
+	"github.com/Sknoww/floe/internal/git"
 )
 
 func TestHeaderPath(t *testing.T) {
@@ -55,7 +58,7 @@ HcmV?d00001
 	if len(files) != 2 {
 		t.Fatalf("splitPatch found %d files, want 2", len(files))
 	}
-	if f := files[0]; f.Path != "t.txt" || f.Binary || !slices.Equal(f.Added, []string{"++ an added line that looks like a header", "added"}) {
+	if f := files[0]; f.Path != "t.txt" || f.Binary || !slices.Equal(f.Added, []git.Line{{No: 2, Text: "++ an added line that looks like a header"}, {No: 3, Text: "added"}}) {
 		t.Errorf("text file: %+v", f)
 	}
 	if f := files[1]; f.Path != "bin.dat" || !f.Binary || len(f.Added) != 0 {
@@ -65,15 +68,16 @@ HcmV?d00001
 
 func TestGuardMatchesAddedLinesAndTheMessage(t *testing.T) {
 	guard := []*regexp.Regexp{regexp.MustCompile(`(?i)acme corp`), regexp.MustCompile(`secret\nplan`)}
-	files := []filePatch{{Path: "a.go", Added: []string{"// for Acme Corp", "fine"}}}
+	files := []filePatch{{Path: "a.go", Added: []git.Line{{No: 7, Text: "// for Acme Corp, and acme corp"}, {No: 8, Text: "fine"}}}}
 	message := "Subject\n\nsecret\nplan for acme corp\n"
 	got := guardMatches(guard, files, message)
 	want := []GuardMatch{
-		{Pattern: "(?i)acme corp", Path: "a.go", Line: "// for Acme Corp"},
-		{Pattern: "(?i)acme corp", Line: "plan for acme corp"},
-		{Pattern: `secret\nplan`, Line: "secret"},
+		{Pattern: "(?i)acme corp", Path: "a.go", LineNo: 7, Line: "// for Acme Corp, and acme corp", Spans: [][2]int{{7, 16}, {22, 31}}},
+		{Pattern: "(?i)acme corp", LineNo: 4, Line: "plan for acme corp", Spans: [][2]int{{9, 18}}},
+		// A match that runs on past its line is marked to the line's end.
+		{Pattern: `secret\nplan`, LineNo: 3, Line: "secret", Spans: [][2]int{{0, 6}}},
 	}
-	if !slices.Equal(got, want) {
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("guardMatches = %+v, want %+v", got, want)
 	}
 }

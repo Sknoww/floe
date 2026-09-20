@@ -155,29 +155,85 @@ func parseRawEntry(meta, path string) (Change, error) {
 	}, nil
 }
 
+// LineCount is how many lines a commit added to one file and deleted from it.
+// A binary file has no lines to count.
+type LineCount struct {
+	Added, Deleted int
+	Binary         bool
+}
+
+// LineCounts reports, by path, the lines a commit added and deleted against its
+// diff base.
+func (r *Repo) LineCounts(ctx context.Context, id string) (map[string]LineCount, error) {
+	base, err := r.diffBase(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	out, err := r.run(ctx, call{args: []string{
+		"diff-tree", "-r", "-z", "--numstat", "--no-renames", "--no-commit-id", base, id,
+	}})
+	if err != nil {
+		return nil, err
+	}
+	counts := map[string]LineCount{}
+	for _, rec := range nulRecords(out) {
+		// "<added>\t<deleted>\t<path>", with "-" for both counts of a binary
+		// file. With renames off there is one path, taken whole.
+		f := strings.SplitN(rec, "\t", 3)
+		if len(f) != 3 {
+			return nil, fmt.Errorf("numstat: malformed entry %q", rec)
+		}
+		if f[0] == "-" && f[1] == "-" {
+			counts[f[2]] = LineCount{Binary: true}
+			continue
+		}
+		added, errAdded := strconv.Atoi(f[0])
+		deleted, errDeleted := strconv.Atoi(f[1])
+		if errAdded != nil || errDeleted != nil {
+			return nil, fmt.Errorf("numstat: malformed entry %q", rec)
+		}
+		counts[f[2]] = LineCount{Added: added, Deleted: deleted}
+	}
+	return counts, nil
+}
+
+// diffArgs starts a `git diff` with every flag user configuration could
+// otherwise change pinned: a diff.noprefix, diff.external or color.diff=always
+// in someone's gitconfig would produce a patch apply cannot read, or reads
+// wrongly.
+func diffArgs(extra ...string) []string {
+	return append([]string{
+		"diff", "--no-renames",
+		"--no-color", "--no-ext-diff", "--no-textconv", "--no-relative",
+		"--src-prefix=a/", "--dst-prefix=b/",
+	}, extra...)
+}
+
 // Patch is the commit's change against its diff base as a binary-safe patch
 // `git apply` accepts, with the given repo-relative paths left out. Each path is
 // excluded literally: matching patterns to paths is the caller's job, done once,
 // so the file list, the patch and the position walk cannot disagree.
 //
-// Every flag user configuration could otherwise change is pinned: a
-// diff.noprefix, diff.external or color.diff=always in someone's gitconfig
-// would produce a patch apply cannot read, or reads wrongly. --full-index
-// writes whole blob ids on the index lines; they are the ids the preimage import
-// supplies.
+// --full-index writes whole blob ids on the index lines; they are the ids the
+// preimage import supplies.
 func (r *Repo) Patch(ctx context.Context, id string, exclude []string) ([]byte, error) {
 	base, err := r.diffBase(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	args := []string{
-		"diff", "--binary", "--full-index", "--no-renames",
-		"--no-color", "--no-ext-diff", "--no-textconv", "--no-relative",
-		"--src-prefix=a/", "--dst-prefix=b/",
-		base, id, "--", ".",
-	}
+	args := append(diffArgs("--binary", "--full-index"), base, id, "--", ".")
 	for _, p := range exclude {
 		args = append(args, ":(exclude,literal)"+p)
 	}
 	return r.run(ctx, call{args: args})
+}
+
+// FileDiff is the commit's change to one path against its diff base, to be read
+// rather than applied: a binary file is reported as one, not encoded.
+func (r *Repo) FileDiff(ctx context.Context, id, path string) ([]byte, error) {
+	base, err := r.diffBase(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return r.run(ctx, call{args: append(diffArgs(), base, id, "--", ":(literal)"+path)})
 }

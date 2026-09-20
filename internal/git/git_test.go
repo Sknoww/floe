@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -566,13 +567,13 @@ func TestSquashMsg(t *testing.T) {
 	if err != nil || p != filepath.Join(r.Dir, ".git", "SQUASH_MSG") {
 		t.Fatalf("SquashMsgPath = %s, %v", p, err)
 	}
-	if has, _ := r.HasSquashMsg(ctx); has {
+	if _, has, _ := r.SquashMsg(ctx); has {
 		t.Error("a fresh repository has a SQUASH_MSG")
 	}
 	if err := r.WriteSquashMsg(ctx, "carried\n"); err != nil {
 		t.Fatal(err)
 	}
-	if has, _ := r.HasSquashMsg(ctx); !has || gittest.Read(t, r.Dir, ".git/SQUASH_MSG") != "carried\n" {
+	if msg, has, _ := r.SquashMsg(ctx); !has || msg != "carried\n" || gittest.Read(t, r.Dir, ".git/SQUASH_MSG") != "carried\n" {
 		t.Error("WriteSquashMsg did not write the message")
 	}
 	if removed, err := r.RemoveSquashMsg(ctx); !removed || err != nil {
@@ -597,5 +598,108 @@ func TestSHA256Repository(t *testing.T) {
 	}
 	if changes, err := r.Changes(ctx, id); err != nil || summarize(changes) != "A a.txt" {
 		t.Errorf("Changes = %q, %v", summarize(changes), err)
+	}
+}
+
+func TestBranch(t *testing.T) {
+	ctx := t.Context()
+	dir := gittest.Init(t)
+	r := open(t, dir)
+	if b, err := r.Branch(ctx); err != nil || b != "main" {
+		t.Errorf("before the first commit: Branch = %q, %v", b, err)
+	}
+	gittest.Write(t, dir, "a.txt", "a\n")
+	gittest.Commit(t, dir, "a")
+	gittest.Git(t, dir, "checkout", "--quiet", "--detach")
+	if b, err := r.Branch(ctx); err != nil || b != "" {
+		t.Errorf("detached: Branch = %q, %v", b, err)
+	}
+}
+
+func TestLineCounts(t *testing.T) {
+	ctx := t.Context()
+	dir := gittest.Init(t)
+	gittest.Write(t, dir, "f.txt", "a\nb\n")
+	gittest.Write(t, dir, "bin.dat", "x\x00y")
+	gittest.Write(t, dir, "tab\tname.txt", "q\n")
+	root := gittest.Commit(t, dir, "root")
+	gittest.Write(t, dir, "f.txt", "a\nB\nc\n")
+	gittest.Write(t, dir, "bin.dat", "x\x00z")
+	gittest.Remove(t, dir, "tab\tname.txt")
+	change := gittest.Commit(t, dir, "change")
+	r := open(t, dir)
+
+	for id, want := range map[string]map[string]LineCount{
+		root:   {"f.txt": {Added: 2}, "bin.dat": {Binary: true}, "tab\tname.txt": {Added: 1}},
+		change: {"f.txt": {Added: 2, Deleted: 1}, "bin.dat": {Binary: true}, "tab\tname.txt": {Deleted: 1}},
+	} {
+		if got, err := r.LineCounts(ctx, id); err != nil || !maps.Equal(got, want) {
+			t.Errorf("LineCounts(%s) = %v, %v; want %v", id, got, err, want)
+		}
+	}
+}
+
+func TestFileDiff(t *testing.T) {
+	ctx := t.Context()
+	dir := gittest.Init(t)
+	gittest.Write(t, dir, "b.txt", "b\n")
+	gittest.Write(t, dir, "[b].txt", "b\n")
+	gittest.Commit(t, dir, "base")
+	gittest.Write(t, dir, "b.txt", "B\n")
+	gittest.Write(t, dir, "[b].txt", "B\n")
+	gittest.Write(t, dir, "bin.dat", "\x00")
+	commit := gittest.Commit(t, dir, "change")
+	gittest.Git(t, dir, "config", "diff.noprefix", "true")
+	r := open(t, dir)
+
+	// The path is literal: as a glob, [b].txt would match b.txt too.
+	diff, err := r.FileDiff(ctx, commit, "[b].txt")
+	if got := string(diff); err != nil || !strings.Contains(got, "--- a/[b].txt\n+++ b/[b].txt\n") || !strings.Contains(got, "-b\n+B\n") || strings.Contains(got, "a/b.txt") {
+		t.Errorf("FileDiff([b].txt) = %v:\n%s", err, got)
+	}
+	if diff, err := r.FileDiff(ctx, commit, "bin.dat"); err != nil || !strings.Contains(string(diff), "Binary files") {
+		t.Errorf("FileDiff(bin.dat) = %q, %v", diff, err)
+	}
+}
+
+func TestStatus(t *testing.T) {
+	ctx := t.Context()
+	dir := gittest.Init(t)
+	gittest.Write(t, dir, "m.txt", "m\n")
+	gittest.Write(t, dir, "d.txt", "d\n")
+	gittest.Commit(t, dir, "base")
+	gittest.Write(t, dir, "m.txt", "changed\n")
+	gittest.Remove(t, dir, "d.txt")
+	gittest.Write(t, dir, "a.txt", "a\n")
+	gittest.Git(t, dir, "add", "a.txt")
+	gittest.Write(t, dir, "untracked.txt", "u\n")
+
+	want := []FileStatus{{"a.txt", 'A'}, {"d.txt", 'D'}, {"m.txt", 'M'}}
+	if got, err := open(t, dir).Status(ctx); err != nil || !slices.Equal(got, want) {
+		t.Errorf("Status = %q, %v; want %q", got, err, want)
+	}
+	for xy, want := range map[string]byte{
+		"UU": 'U', "AA": 'U', "DD": 'U', "AU": 'U', "UA": 'U', "DU": 'U', "UD": 'U',
+		"M ": 'M', " M": 'M', "MD": 'M', "A ": 'A', "AM": 'A', " D": 'D', "T ": 'T',
+	} {
+		if got := statusLetter(xy[0], xy[1]); got != want {
+			t.Errorf("statusLetter(%q) = %c, want %c", xy, got, want)
+		}
+	}
+}
+
+func TestHunkStart(t *testing.T) {
+	for header, want := range map[string]int{
+		"@@ -12,11 +12,10 @@ package limits": 12,
+		"@@ -0,0 +1,12 @@":                   1,
+		"@@ -3 +4 @@":                        4,
+		"@@ -5,2 +4,0 @@":                    4,
+	} {
+		if got, ok := HunkStart(header); !ok || got != want {
+			t.Errorf("HunkStart(%q) = %d, %v; want %d", header, got, ok, want)
+		}
+	}
+	if _, ok := HunkStart("@@ not a hunk @@"); ok {
+		t.Error("HunkStart accepted a malformed header")
 	}
 }

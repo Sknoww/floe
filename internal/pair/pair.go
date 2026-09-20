@@ -53,12 +53,18 @@ type Config struct {
 	LastOpened time.Time `json:"lastOpened,omitzero"`
 }
 
-// FileName is a pair's file name in pairs/: both directories' names, readable
-// in a listing, then the first 8 hex digits of sha256(source + "\0" + target),
-// so same-named repositories in different places never share a file.
-func FileName(source, target string) string {
+// ID names a pair in floe's URLs and file names: both directories' names,
+// readable in a listing, then the first 8 hex digits of
+// sha256(source + "\0" + target), so same-named repositories in different
+// places never share one.
+func ID(source, target string) string {
 	sum := sha256.Sum256([]byte(source + "\x00" + target))
-	return filepath.Base(source) + "--" + filepath.Base(target) + "-" + hex.EncodeToString(sum[:4]) + ".json"
+	return filepath.Base(source) + "--" + filepath.Base(target) + "-" + hex.EncodeToString(sum[:4])
+}
+
+// FileName is a pair's file name in pairs/: its ID, then ".json".
+func FileName(source, target string) string {
+	return ID(source, target) + ".json"
 }
 
 // Path is where a pair's file lives under root.
@@ -71,18 +77,9 @@ func Path(root, source, target string) string {
 // naming the file and the field. A setting that silently didn't apply is
 // indistinguishable on screen from one that did.
 func Load(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	dec := json.NewDecoder(bytes.NewReader(data))
-	dec.DisallowUnknownFields()
 	var c Config
-	if err := dec.Decode(&c); err != nil {
-		return nil, fmt.Errorf("%s: %w", path, err)
-	}
-	if _, err := dec.Token(); err != io.EOF {
-		return nil, fmt.Errorf("%s: unexpected data after the JSON object", path)
+	if err := readStrict(path, &c); err != nil {
+		return nil, err
 	}
 	if err := c.validate(); err != nil {
 		return nil, fmt.Errorf("%s: %w", path, err)
@@ -90,8 +87,44 @@ func Load(path string) (*Config, error) {
 	return &c, nil
 }
 
-// Save writes the file atomically — a temp file, then a rename — so a crash or
-// a full disk never leaves half a file. It refuses a config Load would refuse.
+// LoadID reads the pair an ID names. The ID must be a plain file name, and the
+// file must name the pair the ID is made from, so a renamed or copied file
+// cannot stand in for another pair. An ID that names no pair is an error
+// matching fs.ErrNotExist.
+func LoadID(root, id string) (*Config, error) {
+	if id == "" || id != filepath.Base(id) || strings.ContainsRune(id, 0) {
+		return nil, fmt.Errorf("%q is not a pair id: %w", id, fs.ErrNotExist)
+	}
+	path := filepath.Join(root, "pairs", id+".json")
+	c, err := Load(path)
+	if err != nil {
+		return nil, err
+	}
+	if got := ID(c.Source, c.Target); got != id {
+		return nil, fmt.Errorf("%s: names the pair %s → %s, whose file is %s.json", path, c.Source, c.Target, got)
+	}
+	return c, nil
+}
+
+// readStrict decodes the JSON object in the file at path into v, refusing an
+// unknown field or anything after the object.
+func readStrict(path string, v any) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(v); err != nil {
+		return fmt.Errorf("%s: %w", path, err)
+	}
+	if _, err := dec.Token(); err != io.EOF {
+		return fmt.Errorf("%s: unexpected data after the JSON object", path)
+	}
+	return nil
+}
+
+// Save writes the file atomically. It refuses a config Load would refuse.
 func (c *Config) Save(path string) error {
 	if err := c.validate(); err != nil {
 		return fmt.Errorf("%s: %w", path, err)
@@ -104,12 +137,18 @@ func (c *Config) Save(path string) error {
 	if out.Guard == nil {
 		out.Guard = []string{}
 	}
+	return writeAtomic(path, out)
+}
+
+// writeAtomic writes v as indented JSON through a temp file and a rename, so a
+// crash or a full disk never leaves half a file.
+func writeAtomic(path string, v any) error {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	// Guard patterns are regular expressions: "<" stays "<", not "<".
 	enc.SetEscapeHTML(false)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(out); err != nil {
+	if err := enc.Encode(v); err != nil {
 		return fmt.Errorf("encode %s: %w", path, err)
 	}
 
@@ -181,31 +220,57 @@ func (c *Config) CompiledGuard() ([]*regexp.Regexp, error) {
 	return guard, nil
 }
 
+// ExcludeError is an exclusion pattern that is malformed or can never match,
+// with the pattern it most likely meant when there is one.
+type ExcludeError struct {
+	Reason     string
+	Suggestion string // "" when there is none
+}
+
+func (e *ExcludeError) Error() string { return e.Reason }
+
 // CheckExclude refuses an exclusion pattern that is malformed or can never
-// match a path git reports. Patterns match whole repo-relative paths from the
-// top level: "README.md" is only the top-level README, "docs" is a file named
-// docs, and "docs/**" is everything under the docs directory.
+// match a path git reports, with an *ExcludeError. Patterns match whole
+// repo-relative paths from the top level: "README.md" is only the top-level
+// README, "docs" is a file named docs, and "docs/**" is everything under the
+// docs directory.
 func CheckExclude(pattern string) error {
 	switch {
 	case strings.Trim(pattern, "/") == "":
-		return errors.New("the pattern is empty")
+		return &ExcludeError{Reason: "the pattern is empty"}
 	case strings.HasPrefix(pattern, "/"):
-		return fmt.Errorf("%q can never match: patterns are relative to the repository's top level, so write %q", pattern, strings.TrimLeft(pattern, "/"))
+		return deadPattern(pattern, strings.TrimLeft(pattern, "/"),
+			"%q can never match: patterns are relative to the repository's top level, so write %q")
 	case strings.HasSuffix(pattern, "/"):
-		return fmt.Errorf("%q can never match a file: to exclude everything under a directory, write %q", pattern, strings.TrimRight(pattern, "/")+"/**")
+		return deadPattern(pattern, strings.TrimRight(pattern, "/")+"/**",
+			"%q can never match a file: to exclude everything under a directory, write %q")
 	}
 	for _, seg := range strings.Split(pattern, "/") {
 		switch seg {
 		case "":
-			return fmt.Errorf("%q can never match: it has an empty path segment", pattern)
+			return &ExcludeError{Reason: fmt.Sprintf("%q can never match: it has an empty path segment", pattern)}
 		case ".", "..":
-			return fmt.Errorf("%q can never match: repo-relative paths have no %q segments", pattern, seg)
+			return &ExcludeError{Reason: fmt.Sprintf("%q can never match: repo-relative paths have no %q segments", pattern, seg)}
 		}
 	}
 	if !doublestar.ValidatePattern(pattern) {
-		return fmt.Errorf("%q is not a valid glob", pattern)
+		return &ExcludeError{Reason: fmt.Sprintf("%q is not a valid glob", pattern)}
 	}
 	return nil
+}
+
+// deadPattern refuses pattern, suggesting fix — or what fix is suggested in
+// turn, so "/docs/" is offered "docs/**" rather than another dead pattern. A
+// fix that fails with nothing to suggest is named but not offered.
+func deadPattern(pattern, fix, reason string) error {
+	var fixErr *ExcludeError
+	if errors.As(CheckExclude(fix), &fixErr) {
+		if fixErr.Suggestion == "" {
+			return &ExcludeError{Reason: fmt.Sprintf(reason, pattern, fix)}
+		}
+		fix = fixErr.Suggestion
+	}
+	return &ExcludeError{Reason: fmt.Sprintf(reason, pattern, fix), Suggestion: fix}
 }
 
 // CompileGuard compiles one content guard pattern: a Go (RE2) regular

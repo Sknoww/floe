@@ -19,6 +19,15 @@ func numbered(edit func(n int, line string) string) string {
 	return b.String()
 }
 
+// texts is the text of each line.
+func texts(lines []Line) []string {
+	var out []string
+	for _, l := range lines {
+		out = append(out, l.Text)
+	}
+	return out
+}
+
 // The source's f.txt has a line only it carries at 4, and the source's commit
 // changes line 10. The target rewrote lines 3 to 12. The patch's context is
 // three lines each side of line 10, so it never mentions line 4 — but the
@@ -74,7 +83,7 @@ func TestPreviewConflictsOnAddAddAsApplyDoes(t *testing.T) {
 	if dirty, _ := tgt.Dirty(ctx); len(dirty) != 0 {
 		t.Errorf("Preview touched the target: %q", dirty)
 	}
-	if got := pre.Landed["new.txt"]; !slices.Contains(got, "the source adds") || slices.Contains(got, "the target has") {
+	if got := texts(pre.Landed["new.txt"]); !slices.Contains(got, "the source adds") || slices.Contains(got, "the target has") {
 		t.Errorf("Landed[new.txt] = %q", got)
 	}
 
@@ -84,6 +93,9 @@ func TestPreviewConflictsOnAddAddAsApplyDoes(t *testing.T) {
 	}
 	if !slices.Equal(res.Conflicts, pre.Conflicts) {
 		t.Errorf("Apply conflicts = %q, Preview's = %q", res.Conflicts, pre.Conflicts)
+	}
+	if got := gittest.Read(t, d, "new.txt"); pre.Conflicted["new.txt"] != got {
+		t.Errorf("Conflicted[new.txt] = %q, apply wrote %q", pre.Conflicted["new.txt"], got)
 	}
 }
 
@@ -108,6 +120,8 @@ func TestPreviewReportsWhatLands(t *testing.T) {
 	gittest.Write(t, d, "gone.txt", "bye\n")
 	gittest.Write(t, d, "b.bin", "\x00base")
 	head := gittest.Commit(t, d, "target")
+	// The conflict the user is shown follows the target's style, as apply does.
+	gittest.Git(t, d, "config", "merge.conflictStyle", "diff3")
 
 	src, tgt := open(t, s), open(t, d)
 	patch, err := src.Patch(ctx, commit, nil)
@@ -126,17 +140,17 @@ func TestPreviewReportsWhatLands(t *testing.T) {
 		t.Fatalf("Preview conflicts = %q", pre.Conflicts)
 	}
 
-	for path, want := range map[string][]string{"clean.txt": {"added"}, "new.txt": {"n1", "n2"}} {
+	for path, want := range map[string][]Line{"clean.txt": {{2, "added"}}, "new.txt": {{1, "n1"}, {2, "n2"}}} {
 		if got := pre.Landed[path]; !slices.Equal(got, want) {
-			t.Errorf("Landed[%s] = %q, want %q", path, got, want)
+			t.Errorf("Landed[%s] = %v, want %v", path, got, want)
 		}
 	}
 	for _, path := range []string{"gone.txt", "b.bin"} {
 		if got, ok := pre.Landed[path]; ok {
-			t.Errorf("Landed[%s] = %q, want nothing", path, got)
+			t.Errorf("Landed[%s] = %v, want nothing", path, got)
 		}
 	}
-	f := pre.Landed["f.txt"]
+	f := texts(pre.Landed["f.txt"])
 	if !slices.Contains(f, "source only") || !slices.Contains(f, "SRC10") {
 		t.Errorf("Landed[f.txt] misses the conflict's source lines: %q", f)
 	}
@@ -150,6 +164,9 @@ func TestPreviewReportsWhatLands(t *testing.T) {
 	// the preview reported.
 	if _, err := tgt.Apply(ctx, patch); err != nil {
 		t.Fatal(err)
+	}
+	if got := gittest.Read(t, d, "f.txt"); pre.Conflicted["f.txt"] != got || len(pre.Conflicted) != 1 {
+		t.Errorf("Conflicted = %q, apply wrote f.txt as %q", pre.Conflicted, got)
 	}
 	had := strings.Split(wideTarget, "\n")
 	for _, line := range strings.Split(strings.TrimSuffix(gittest.Read(t, d, "f.txt"), "\n"), "\n") {
@@ -186,7 +203,7 @@ func TestPreviewLandedFollowsAMergeDriver(t *testing.T) {
 	if len(pre.Conflicts) != 0 {
 		t.Errorf("Preview conflicts = %q, want none", pre.Conflicts)
 	}
-	if got := pre.Landed["f.txt"]; !slices.Contains(got, "source only") {
+	if got := texts(pre.Landed["f.txt"]); !slices.Contains(got, "source only") {
 		t.Errorf("Landed[f.txt] = %q, want the source's line 4", got)
 	}
 }

@@ -2,6 +2,8 @@ package transfer
 
 import (
 	"errors"
+	"fmt"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -88,6 +90,13 @@ func TestTransferStagesAndCarriesTheMessage(t *testing.T) {
 	if got := summarize(pv.Result.Files); got != "M f.txt, D gone.txt, A new/n.txt" || len(pv.Result.Conflicts) != 0 {
 		t.Errorf("preview result: %q, conflicts %q", got, pv.Result.Conflicts)
 	}
+	var counts []string
+	for _, f := range pv.Files {
+		counts = append(counts, fmt.Sprintf("%s +%d -%d", f.Path, f.Lines.Added, f.Lines.Deleted))
+	}
+	if want := []string{"f.txt +1 -1", "gone.txt +0 -1", "new/n.txt +1 -0"}; !slices.Equal(counts, want) {
+		t.Errorf("line counts = %q, want %q", counts, want)
+	}
 
 	if _, err := p.Apply(ctx, pv); err != nil {
 		t.Fatal(err)
@@ -141,7 +150,8 @@ func TestConflictStopsWithMarkersAndAborts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(st.Conflicts, []string{"f.txt"}) || !st.Message {
+	if !slices.Equal(st.Conflicts, []string{"f.txt"}) || !slices.Equal(st.Dirty, []git.FileStatus{{Path: "f.txt", Status: 'U'}}) ||
+		!st.HasMessage || st.Message != pv.Message || st.Branch != "main" {
 		t.Errorf("state after conflict: %+v", st)
 	}
 
@@ -185,7 +195,7 @@ func TestStaleSquashMsgIsRemoved(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if st.Message || gittest.Exists(t, tgt, ".git/SQUASH_MSG") {
+	if st.HasMessage || gittest.Exists(t, tgt, ".git/SQUASH_MSG") {
 		t.Error("a SQUASH_MSG beside a clean tree survived")
 	}
 }
@@ -302,7 +312,7 @@ func TestContentGuard(t *testing.T) {
 	if _, err := p.Preview(ctx, Request{Commit: added, Guard: guard}); !errors.As(err, &ge) {
 		t.Fatalf("added line: Preview = %v, want *GuardError", err)
 	}
-	if want := []GuardMatch{{Pattern: "(?i)acme corp", Path: "x.txt", Line: "calls the Acme Corp API"}}; !slices.Equal(ge.Matches, want) {
+	if want := []GuardMatch{{Pattern: "(?i)acme corp", Path: "x.txt", LineNo: 1, Line: "calls the Acme Corp API", Spans: [][2]int{{10, 19}}}}; !reflect.DeepEqual(ge.Matches, want) {
 		t.Errorf("matches = %+v, want %+v", ge.Matches, want)
 	}
 	wBlob := gittest.Git(t, src, "rev-parse", added+"^:w.txt")
@@ -356,9 +366,12 @@ func TestContentGuardScansWhatAMergeBringsIn(t *testing.T) {
 	if _, err := p.Preview(ctx, Request{Commit: conflicting, Guard: guard}); !errors.As(err, &ge) {
 		t.Fatalf("Preview = %v, want *GuardError", err)
 	}
-	want := GuardMatch{Pattern: "(?i)acme corp", Path: "f.txt", Line: "ACME Corp internal", Merged: true}
+	want := GuardMatch{Pattern: "(?i)acme corp", Path: "f.txt", Line: "ACME Corp internal", Spans: [][2]int{{0, 9}}, Merged: true}
 	for _, m := range ge.Matches {
-		if m != want {
+		if m.LineNo < 1 {
+			t.Errorf("match %+v has no line number", m)
+		}
+		if m.LineNo = 0; !reflect.DeepEqual(m, want) {
 			t.Errorf("match %+v, want %+v", m, want)
 		}
 	}

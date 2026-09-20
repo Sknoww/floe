@@ -7,13 +7,17 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+
+	"github.com/Sknoww/floe/internal/git"
 )
 
 // filePatch is one file's section of a patch.
 type filePatch struct {
 	Path   string
 	Binary bool
-	Added  []string // added lines, without the leading "+"
+	// Added holds the added lines, without the leading "+", numbered as they
+	// stand in the file's new version.
+	Added []git.Line
 }
 
 // splitPatch reads a patch from git.Repo.Patch into its file sections. Only
@@ -21,6 +25,7 @@ type filePatch struct {
 func splitPatch(patch []byte) ([]filePatch, error) {
 	var files []filePatch
 	inHunk := false
+	next := 0 // the new version's number for the hunk's next line
 	for _, line := range strings.Split(string(patch), "\n") {
 		// A hunk line starts with ' ', '+', '-' or '\', so a line starting
 		// "diff --git " is always a new file's header.
@@ -45,9 +50,18 @@ func splitPatch(patch []byte) ([]filePatch, error) {
 		case !inHunk && line == "GIT binary patch":
 			f.Binary = true
 		case strings.HasPrefix(line, "@@ "):
-			inHunk = true
+			n, ok := git.HunkStart(line)
+			if !ok {
+				return nil, fmt.Errorf("patch: malformed hunk header %q", line)
+			}
+			inHunk, next = true, n
 		case inHunk && strings.HasPrefix(line, "+"):
-			f.Added = append(f.Added, line[1:])
+			f.Added = append(f.Added, git.Line{No: next, Text: line[1:]})
+			next++
+		case inHunk && (line == "" || line[0] == ' '):
+			// A context line. diff.suppressBlankEmpty writes an empty one as
+			// nothing at all.
+			next++
 		}
 	}
 	return files, nil
@@ -105,7 +119,14 @@ func closingQuote(s string) int {
 type GuardMatch struct {
 	Pattern string
 	Path    string // the file whose line matched; "" for the commit message
-	Line    string // the line that matched, without the patch's leading "+"
+	// LineNo numbers the line that matched: in the file's new version for a
+	// line of the patch, in the merged result for a line the merge brought in
+	// (in diff3 style, for a conflict), or in the commit message.
+	LineNo int
+	Line   string // the line that matched, without the patch's leading "+"
+	// Spans are the byte ranges of Line the pattern matched, zero-width matches
+	// left out. A match in the message that runs past its line stops there.
+	Spans [][2]int
 	// Merged marks a line the 3-way merge brought in beyond the patch's added
 	// lines: a side of a conflict, or what a merge driver kept.
 	Merged bool
@@ -145,7 +166,13 @@ func guardMatches(guard []*regexp.Regexp, files []filePatch, message string) []G
 			if end < 0 {
 				end = len(message) - start
 			}
-			matches = append(matches, GuardMatch{Pattern: re.String(), Line: message[start : start+end]})
+			line := message[start : start+end]
+			matches = append(matches, GuardMatch{
+				Pattern: re.String(),
+				LineNo:  strings.Count(message[:start], "\n") + 1,
+				Line:    line,
+				Spans:   spans([][]int{{loc[0] - start, min(loc[1]-start, len(line))}}),
+			})
 		}
 	}
 	return matches
@@ -155,7 +182,7 @@ func guardMatches(guard []*regexp.Regexp, files []filePatch, message string) []G
 // into each file (git.ApplyResult.Landed), in path order. The patch's added
 // lines are among them and have already passed, so every match is a line the
 // merge brought in.
-func landedMatches(guard []*regexp.Regexp, landed map[string][]string) []GuardMatch {
+func landedMatches(guard []*regexp.Regexp, landed map[string][]git.Line) []GuardMatch {
 	paths := slices.Sorted(maps.Keys(landed))
 	var matches []GuardMatch
 	for _, re := range guard {
@@ -166,12 +193,30 @@ func landedMatches(guard []*regexp.Regexp, landed map[string][]string) []GuardMa
 	return matches
 }
 
-func lineMatches(re *regexp.Regexp, path string, lines []string, merged bool) []GuardMatch {
+func lineMatches(re *regexp.Regexp, path string, lines []git.Line, merged bool) []GuardMatch {
 	var matches []GuardMatch
 	for _, line := range lines {
-		if re.MatchString(line) {
-			matches = append(matches, GuardMatch{Pattern: re.String(), Path: path, Line: line, Merged: merged})
+		if locs := re.FindAllStringIndex(line.Text, -1); locs != nil {
+			matches = append(matches, GuardMatch{
+				Pattern: re.String(),
+				Path:    path,
+				LineNo:  line.No,
+				Line:    line.Text,
+				Spans:   spans(locs),
+				Merged:  merged,
+			})
 		}
 	}
 	return matches
+}
+
+// spans keeps the matched ranges that cover at least one byte.
+func spans(locs [][]int) [][2]int {
+	var out [][2]int
+	for _, loc := range locs {
+		if loc[1] > loc[0] {
+			out = append(out, [2]int{loc[0], loc[1]})
+		}
+	}
+	return out
 }

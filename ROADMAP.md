@@ -58,6 +58,9 @@ from every transfer.
 - Excluded files stay visible in a commit's file list, struck through. Individual files can be
   unticked for a single transfer.
 - On a conflict, floe stops with the markers in place and offers open-in-editor or discard.
+- **Discard is offered only for a transfer floe recorded.** Floe records the transfer it
+  applies outside both repositories, and it counts only while that transfer still waits in
+  the target — after a restart too. Changes floe did not make are never discarded.
 - **Open in editor launches VS Code** on the target, at the conflicted file, or the system's
   default text editor where VS Code is not installed. Not `$VISUAL`: a terminal editor
   cannot be opened from a click in the browser.
@@ -82,13 +85,19 @@ None.
    `SQUASH_MSG`. `internal/transfer` orders them — refuse before writing — and computes the
    position. Exclusions arrive as a predicate and guard patterns compiled; matching them and
    the config file are area 6. Tested against scratch repositories with unrelated histories.
-4. ⏳ **Server** — loopback binding, token, `Host`/`Origin` checks, JSON API over the git layer.
-   The design also needs per-file line counts, which the git layer does not report yet.
-5. ⏳ **UI** — the screens from area 2.
+4. ✅ **Server** — `main.go` and `internal/server`: loopback binding, the token, `Host` and
+   `Origin` checks, and the JSON API in `CONTEXT.md` over the transfer and pair layers. The
+   git layer gained what the screens need: line counts, one file's diff, the branch, status
+   letters, the carried message, and a conflict as it will land. A transfer floe applies is
+   recorded, so Discard survives a restart and is never offered over the user's own work.
+   `web/embed.go` embeds a placeholder until area 5 builds the frontend.
+5. ⏳ **UI** — the screens from area 2, against the API. Starts with `web/`'s Vite project and
+   the dev loop the `dev` build tag expects.
 6. 🛠️ **Exclusions and content guard** — `internal/pair` reads and writes each pair's config
    and lists the remembered pairs; exclusions are matched and guard patterns compiled there.
-   The guard also scans what a 3-way merge brings in. Still to come: editing both from the UI,
-   including "never transfer" on a file row, once areas 4 and 5 exist.
+   The guard also scans what a 3-way merge brings in. The API saves both lists and checks a
+   pattern as it is typed, with floe's suggested fix. Still to come: the settings screen and
+   "never transfer" on a file row, with area 5.
 7. ⏳ **Release** — GoReleaser, the cask, `README.md`.
 8. ⏸️ **Whole-tree comparison** — source HEAD against the target, beyond the per-commit
    nearest match.

@@ -1,6 +1,8 @@
 package pair
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -146,6 +148,92 @@ func TestCheckExclude(t *testing.T) {
 		if err := CheckExclude(p); err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("CheckExclude(%q) = %v, want an error containing %q", p, err, want)
 		}
+	}
+	for p, want := range map[string]string{
+		"/README.md": "README.md",
+		"docs/":      "docs/**",
+		"/docs/":     "docs/**", // not "docs/", which can never match either
+		"/a//b":      "",
+		"a[":         "",
+	} {
+		var ee *ExcludeError
+		if !errors.As(CheckExclude(p), &ee) {
+			t.Errorf("CheckExclude(%q) is not an *ExcludeError", p)
+		} else if ee.Suggestion != want {
+			t.Errorf("CheckExclude(%q) suggests %q, want %q", p, ee.Suggestion, want)
+		}
+	}
+}
+
+func TestLoadID(t *testing.T) {
+	root := t.TempDir()
+	c, err := Remember(root, "/work/app-internal", "/work/app-public", time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := ID(c.Source, c.Target)
+	if got, err := LoadID(root, id); err != nil || got.Source != c.Source || got.Target != c.Target {
+		t.Errorf("LoadID(%q) = %+v, %v", id, got, err)
+	}
+	for _, bad := range []string{"", "../pairs/" + id, id + "/x", "app-internal--app-public-00000000"} {
+		if _, err := LoadID(root, bad); !errors.Is(err, fs.ErrNotExist) {
+			t.Errorf("LoadID(%q) = %v, want an error matching fs.ErrNotExist", bad, err)
+		}
+	}
+
+	// A copy under another pair's name does not stand in for it.
+	raw, err := os.ReadFile(Path(root, c.Source, c.Target))
+	if err != nil {
+		t.Fatal(err)
+	}
+	other := ID("/work/other", "/work/app-public")
+	if err := os.WriteFile(filepath.Join(root, "pairs", other+".json"), raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadID(root, other); err == nil || !strings.Contains(err.Error(), "names the pair") {
+		t.Errorf("LoadID of a copied file = %v", err)
+	}
+}
+
+func TestTransferRecord(t *testing.T) {
+	root := t.TempDir()
+	src, tgt := "/work/app-internal", "/work/app-public"
+	if rec, err := LoadTransfer(root, src, tgt); rec != nil || err != nil {
+		t.Errorf("with no record: LoadTransfer = %+v, %v", rec, err)
+	}
+	if err := ClearTransfer(root, src, tgt); err != nil {
+		t.Errorf("ClearTransfer with no record = %v", err)
+	}
+
+	want := Transfer{
+		Commit:  strings.Repeat("a", 40),
+		Skip:    []string{"lib.go"},
+		Applied: time.Date(2026, 9, 13, 12, 0, 0, 500, time.FixedZone("MDT", -6*3600)),
+	}
+	if err := SaveTransfer(root, src, tgt, &want); err != nil {
+		t.Fatal(err)
+	}
+	got, err := LoadTransfer(root, src, tgt)
+	if err != nil || got.Commit != want.Commit || got.TargetHead != "" || !slices.Equal(got.Skip, want.Skip) ||
+		!got.Applied.Equal(want.Applied.Truncate(time.Second)) {
+		t.Errorf("LoadTransfer = %+v, %v; want %+v", got, err, want)
+	}
+	if pairs, err := List(root); err != nil || len(pairs) != 0 {
+		t.Errorf("a transfer record was listed as a pair: %+v, %v", pairs, err)
+	}
+
+	if err := ClearTransfer(root, src, tgt); err != nil {
+		t.Fatal(err)
+	}
+	if rec, err := LoadTransfer(root, src, tgt); rec != nil || err != nil {
+		t.Errorf("after ClearTransfer: LoadTransfer = %+v, %v", rec, err)
+	}
+
+	if err := os.WriteFile(TransferPath(root, src, tgt), []byte(`{"commit":"x","extra":1}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadTransfer(root, src, tgt); err == nil || !strings.Contains(err.Error(), "extra") {
+		t.Errorf("LoadTransfer of a record with an unknown field = %v", err)
 	}
 }
 

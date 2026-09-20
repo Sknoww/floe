@@ -19,23 +19,56 @@ func nulRecords(out []byte) []string {
 	return strings.Split(s, "\x00")
 }
 
-// Dirty lists the tracked paths that have changes, staged or not. Untracked
-// files are not counted: they cannot mix into a commit, and a patch that would
-// overwrite one is refused by git apply itself.
-func (r *Repo) Dirty(ctx context.Context) ([]string, error) {
+// FileStatus is a tracked path with changes, as `git status` reports it.
+type FileStatus struct {
+	Path string
+	// Status is one letter: 'U' for a conflict, else the staged change's ('M',
+	// 'A', 'D', 'T') when there is one, else the working tree's.
+	Status byte
+}
+
+// Status lists the tracked paths that have changes, staged or not, in path
+// order. Untracked files are not counted: they cannot mix into a commit, and a
+// patch that would overwrite one is refused by git apply itself.
+func (r *Repo) Status(ctx context.Context) ([]FileStatus, error) {
 	out, err := r.run(ctx, call{args: []string{
 		"status", "--porcelain", "-z", "--untracked-files=no", "--no-renames",
 	}})
 	if err != nil {
 		return nil, err
 	}
-	var paths []string
+	var files []FileStatus
 	for _, rec := range nulRecords(out) {
 		// "XY <path>"; with renames off there is never a second path.
 		if len(rec) < 4 {
 			return nil, fmt.Errorf("status: malformed entry %q", rec)
 		}
-		paths = append(paths, rec[3:])
+		files = append(files, FileStatus{Path: rec[3:], Status: statusLetter(rec[0], rec[1])})
+	}
+	return files, nil
+}
+
+// statusLetter reduces a porcelain XY code to one letter. The unmerged codes
+// are DD, AU, UD, UA, DU, AA and UU.
+func statusLetter(x, y byte) byte {
+	switch {
+	case x == 'U' || y == 'U' || (x == y && (x == 'A' || x == 'D')):
+		return 'U'
+	case x != ' ':
+		return x
+	}
+	return y
+}
+
+// Dirty lists the paths Status reports.
+func (r *Repo) Dirty(ctx context.Context) ([]string, error) {
+	files, err := r.Status(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, f := range files {
+		paths = append(paths, f.Path)
 	}
 	return paths, nil
 }
@@ -167,11 +200,14 @@ type ApplyResult struct {
 	// Conflicts lists the paths left with conflict markers.
 	Conflicts []string
 	// Landed is filled by Preview only: for each text file, the lines the
-	// result adds to the target's own version of it. That is every line the
-	// transfer brings in, including what a 3-way merge takes from the source
-	// beyond the patch's added lines — both sides of a conflict, and whatever a
-	// merge driver keeps.
-	Landed map[string][]string
+	// result adds to the target's own version of it, numbered as they stand in
+	// the result. That is every line the transfer brings in, including what a
+	// 3-way merge takes from the source beyond the patch's added lines — both
+	// sides of a conflict, and whatever a merge driver keeps.
+	Landed map[string][]Line
+	// Conflicted is filled by Preview only: each conflicted text file as the
+	// apply will write it, conflict markers included.
+	Conflicted map[string]string
 }
 
 // ApplyError is a patch git refused. Nothing was written: git apply is all or
@@ -223,7 +259,7 @@ func (r *Repo) Preview(ctx context.Context, head string, patch []byte) (*ApplyRe
 	if err != nil {
 		return nil, err
 	}
-	if res.Landed, err = r.landed(ctx, env, dir, res.Files); err != nil {
+	if res.Landed, res.Conflicted, err = r.landed(ctx, env, dir, res.Files); err != nil {
 		return nil, err
 	}
 	return res, nil
@@ -358,18 +394,19 @@ func (r *Repo) WriteSquashMsg(ctx context.Context, msg string) error {
 	return os.WriteFile(p, []byte(msg), 0o644)
 }
 
-// HasSquashMsg reports whether a SQUASH_MSG is waiting.
-func (r *Repo) HasSquashMsg(ctx context.Context) (bool, error) {
+// SquashMsg reads the waiting SQUASH_MSG, reporting whether there is one.
+func (r *Repo) SquashMsg(ctx context.Context) (string, bool, error) {
 	p, err := r.SquashMsgPath(ctx)
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
-	if _, err := os.Stat(p); errors.Is(err, fs.ErrNotExist) {
-		return false, nil
+	msg, err := os.ReadFile(p)
+	if errors.Is(err, fs.ErrNotExist) {
+		return "", false, nil
 	} else if err != nil {
-		return false, err
+		return "", false, err
 	}
-	return true, nil
+	return string(msg), true, nil
 }
 
 // RemoveSquashMsg removes SQUASH_MSG, reporting whether there was one.

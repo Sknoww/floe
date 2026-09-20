@@ -6,8 +6,29 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 )
+
+// Line is one line of a file, numbered from 1.
+type Line struct {
+	No   int
+	Text string
+}
+
+var hunkHeader = regexp.MustCompile(`^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@`)
+
+// HunkStart reads a unified diff's hunk header, "@@ -a,b +c,d @@", and returns
+// c: the number of the first line of the new side the hunk covers.
+func HunkStart(header string) (int, bool) {
+	m := hunkHeader.FindStringSubmatch(header)
+	if m == nil {
+		return 0, false
+	}
+	n, err := strconv.Atoi(m[1])
+	return n, err == nil
+}
 
 // refreshPaths refreshes the stat data of the temporary index's entries for
 // the paths a patch touches. A read-tree index has none, so to git every file
@@ -58,20 +79,22 @@ func (r *Repo) refreshPaths(ctx context.Context, env []string, patch []byte) err
 }
 
 // landed reads what a preview's result brings into each text file: the lines
-// it adds to the target's own version. A clean file's result is its blob in
-// the temporary index. A conflict is rebuilt from its stages as the real apply
-// writes it, in diff3 style so the base lines count too. Deletions and
-// submodules bring in no lines, and binary files are left out: git merges
-// none, and the transfer names them.
+// it adds to the target's own version, numbered as they stand in the result. A
+// clean file's result is its blob in the temporary index. A conflict is rebuilt
+// from its stages in diff3 style, so the base lines count too — and rebuilt
+// again as the real apply writes it, which is returned whole for the user to
+// see. Deletions and submodules bring in no lines, and binary files are left
+// out: git merges none, and the transfer names them.
 //
 // dir is the preview's temporary directory; the versions compared are written
 // there, and nothing else is.
-func (r *Repo) landed(ctx context.Context, env []string, dir string, files []Change) (map[string][]string, error) {
+func (r *Repo) landed(ctx context.Context, env []string, dir string, files []Change) (map[string][]Line, map[string]string, error) {
 	stages, err := r.stages(ctx, env)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	landed := map[string][]string{}
+	landed := map[string][]Line{}
+	conflicted := map[string]string{}
 	for _, f := range files {
 		var ours, result []byte
 		switch {
@@ -82,26 +105,31 @@ func (r *Repo) landed(ctx context.Context, env []string, dir string, files []Cha
 					continue // an add/add conflict has no base
 				}
 				if blobs[i], err = r.blob(ctx, id); err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 			}
 			if isBinary(blobs[0]) || isBinary(blobs[1]) || isBinary(blobs[2]) {
 				continue
 			}
 			ours = blobs[1]
-			if result, err = r.mergeFile(ctx, dir, blobs); err != nil {
-				return nil, err
+			if result, err = r.mergeFile(ctx, dir, blobs, true); err != nil {
+				return nil, nil, err
 			}
+			var written []byte
+			if written, err = r.mergeFile(ctx, dir, blobs, false); err != nil {
+				return nil, nil, err
+			}
+			conflicted[f.Path] = string(written)
 		case f.Status == 'D' || f.NewMode == gitlinkMode:
 			continue
 		default:
 			if !isZeroID(f.OldID) && f.OldMode != gitlinkMode {
 				if ours, err = r.blob(ctx, f.OldID); err != nil {
-					return nil, err
+					return nil, nil, err
 				}
 			}
 			if result, err = r.blob(ctx, f.NewID); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 			if isBinary(ours) || isBinary(result) {
 				continue
@@ -109,13 +137,13 @@ func (r *Repo) landed(ctx context.Context, env []string, dir string, files []Cha
 		}
 		lines, err := r.addedLines(ctx, dir, ours, result)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if len(lines) > 0 {
 			landed[f.Path] = lines
 		}
 	}
-	return landed, nil
+	return landed, conflicted, nil
 }
 
 // stages reads the index's unmerged entries by path: the blob ids of stages 1
@@ -154,9 +182,11 @@ func isBinary(b []byte) bool {
 }
 
 // mergeFile rebuilds a conflicted file from its base, ours and theirs versions,
-// with the markers `git apply --3way` writes, in diff3 style. It merges as git's
-// stock text merge does: a custom merge driver is not run.
-func (r *Repo) mergeFile(ctx context.Context, dir string, blobs [3][]byte) ([]byte, error) {
+// with the markers `git apply --3way` writes. It merges as git's stock text
+// merge does: a custom merge driver is not run. With diff3 the base is always
+// written between the sides; without it the markers follow the target's
+// merge.conflictStyle, and the result is byte for byte what the apply writes.
+func (r *Repo) mergeFile(ctx context.Context, dir string, blobs [3][]byte, diff3 bool) ([]byte, error) {
 	var paths [3]string
 	for i, name := range []string{"base", "ours", "theirs"} {
 		paths[i] = filepath.Join(dir, name)
@@ -164,10 +194,12 @@ func (r *Repo) mergeFile(ctx context.Context, dir string, blobs [3][]byte) ([]by
 			return nil, err
 		}
 	}
-	out, err := r.run(ctx, call{args: []string{
-		"merge-file", "-p", "--diff3", "-L", "ours", "-L", "base", "-L", "theirs",
-		paths[1], paths[0], paths[2],
-	}})
+	args := []string{"merge-file", "-p"}
+	if diff3 {
+		args = append(args, "--diff3")
+	}
+	args = append(args, "-L", "ours", "-L", "base", "-L", "theirs", paths[1], paths[0], paths[2])
+	out, err := r.run(ctx, call{args: args})
 	// merge-file exits with the number of conflicts, capped at 127; an error
 	// is negative, which reaches us as 255.
 	if code := exitCode(err); err != nil && (code < 1 || code > 127) {
@@ -176,8 +208,9 @@ func (r *Repo) mergeFile(ctx context.Context, dir string, blobs [3][]byte) ([]by
 	return out, nil
 }
 
-// addedLines returns the lines to adds to from, without their "+".
-func (r *Repo) addedLines(ctx context.Context, dir string, from, to []byte) ([]string, error) {
+// addedLines returns the lines to adds to from, without their "+", numbered as
+// they stand in to.
+func (r *Repo) addedLines(ctx context.Context, dir string, from, to []byte) ([]Line, error) {
 	a, b := filepath.Join(dir, "from"), filepath.Join(dir, "to")
 	if err := os.WriteFile(a, from, 0o600); err != nil {
 		return nil, err
@@ -193,14 +226,20 @@ func (r *Repo) addedLines(ctx context.Context, dir string, from, to []byte) ([]s
 	if err != nil && exitCode(err) != 1 {
 		return nil, err
 	}
-	var lines []string
-	inHunk := false
+	var lines []Line
+	next := 0 // the number of the next line of to; 0 before the first hunk
 	for _, line := range strings.Split(string(out), "\n") {
 		switch {
 		case strings.HasPrefix(line, "@@ "):
-			inHunk = true
-		case inHunk && strings.HasPrefix(line, "+"):
-			lines = append(lines, line[1:])
+			n, ok := HunkStart(line)
+			if !ok {
+				return nil, fmt.Errorf("diff: malformed hunk header %q", line)
+			}
+			next = n
+		case next > 0 && strings.HasPrefix(line, "+"):
+			// With no context lines, only an added line moves through to.
+			lines = append(lines, Line{No: next, Text: line[1:]})
+			next++
 		}
 	}
 	return lines, nil
