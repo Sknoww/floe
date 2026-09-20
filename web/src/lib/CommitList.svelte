@@ -16,6 +16,7 @@
     nearest,
     targetName,
     tags,
+    locked = false,
     onselect,
   }: {
     commits: Commit[]
@@ -24,6 +25,12 @@
     nearest: boolean
     targetName: string
     tags: Record<string, string>
+    /*
+     * A transfer is waiting in the target, so the commit it carried is what
+     * the whole screen is about: another one cannot be picked until it is
+     * committed or discarded.
+     */
+    locked?: boolean
     onselect: (id: string) => void
   } = $props()
 
@@ -45,9 +52,16 @@
       class:selected={c.id === selected}
       class:older={older(i)}
       type="button"
+      disabled={locked}
       onclick={() => onselect(c.id)}
     >
-      <span class="dot" class:at={i === at} class:past={older(i)} class:on={c.id === selected}
+      <span
+        class="dot"
+        class:at={i === at}
+        class:past={older(i)}
+        class:on={c.id === selected}
+        class:waiting={!!tags[c.id]}
+        class:conflicted={tags[c.id] === 'conflict'}
       ></span>
       <span class="mono id">{c.id.slice(0, 7)}</span>
       <span class="subject">{c.subject}</span>
@@ -94,8 +108,12 @@
     cursor: pointer;
   }
 
-  .row:hover:not(.selected) {
+  .row:hover:not(.selected):not(:disabled) {
     background: var(--raised);
+  }
+
+  .row:disabled {
+    cursor: default;
   }
 
   .selected {
@@ -124,6 +142,16 @@
   .dot.at {
     border-color: var(--accent);
     background: var(--accent);
+  }
+
+  /* A transfer of this commit's is waiting in the target, and the dot takes
+     the colour of the tag that says so. */
+  .dot.waiting {
+    border-color: var(--accent);
+  }
+
+  .dot.waiting.conflicted {
+    border-color: var(--attention);
   }
 
   /* Filled grey: older history. */

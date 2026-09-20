@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"slices"
 
+	"github.com/Sknoww/floe/internal/editor"
 	"github.com/Sknoww/floe/internal/git"
 	"github.com/Sknoww/floe/internal/pair"
 	"github.com/Sknoww/floe/internal/transfer"
@@ -574,6 +575,56 @@ func (s *Server) discard(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := pair.ClearTransfer(s.root, c.Source, c.Target); err != nil {
 		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, struct{}{})
+}
+
+type editorRequest struct {
+	// Path is repo-relative, and empty opens the repository alone.
+	Path string `json:"path"`
+	// Line numbers from 1; 0 is the file's top.
+	Line int `json:"line"`
+}
+
+// openEditor opens the target repository in the user's editor, at the file the
+// page names. VS Code's commit box picks up the carried message there, and it
+// has the conflict tooling; where VS Code is not installed the file opens in
+// the system's default text editor.
+//
+// Only a path git reports in the target — changed or unmerged — is opened:
+// joining a path onto the repository cleans away "..", so the set git reports
+// is the boundary rather than the join.
+func (s *Server) openEditor(w http.ResponseWriter, r *http.Request) {
+	var req editorRequest
+	if err := readJSON(w, r, &req); err != nil {
+		writeError(w, err)
+		return
+	}
+	p, _, err := s.open(r)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	if req.Path != "" {
+		st, err := p.State(r.Context())
+		if err != nil {
+			writeError(w, err)
+			return
+		}
+		known := slices.Contains(st.Conflicts, req.Path) ||
+			slices.ContainsFunc(st.Dirty, func(c git.FileStatus) bool { return c.Path == req.Path })
+		if !known {
+			writeError(w, &apiError{
+				Status:  http.StatusNotFound,
+				Code:    "not_changed",
+				Message: fmt.Sprintf("%s is not a file this transfer changed in %s", req.Path, filepath.Base(p.Target.Dir)),
+			})
+			return
+		}
+	}
+	if err := editor.Open(r.Context(), p.Target.Dir, req.Path, req.Line); err != nil {
+		writeError(w, &apiError{Status: http.StatusInternalServerError, Code: "editor", Message: err.Error()})
 		return
 	}
 	writeJSON(w, http.StatusOK, struct{}{})

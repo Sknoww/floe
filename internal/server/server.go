@@ -137,6 +137,7 @@ func (s *Server) Handler() http.Handler {
 	api.HandleFunc("POST /api/pairs/{pair}/preview", s.preview)
 	api.HandleFunc("POST /api/pairs/{pair}/apply", s.apply)
 	api.HandleFunc("POST /api/pairs/{pair}/discard", s.discard)
+	api.HandleFunc("POST /api/pairs/{pair}/editor", s.openEditor)
 	api.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, &apiError{
 			Status:  http.StatusNotFound,

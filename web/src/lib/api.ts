@@ -149,4 +149,13 @@ export class Api {
   discard(id: string): Promise<void> {
     return this.#call('POST', `/api/pairs/${encodeURIComponent(id)}/discard`)
   }
+
+  /**
+   * Opens the target in VS Code — or the default text editor where it is not
+   * installed — at `path`, which must be one git reports as changed there.
+   * `line` numbers from 1; 0 is the file's top.
+   */
+  editor(id: string, path = '', line = 0): Promise<void> {
+    return this.#call('POST', `/api/pairs/${encodeURIComponent(id)}/editor`, { path, line })
+  }
 }

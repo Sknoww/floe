@@ -58,12 +58,17 @@ from every transfer.
 - Excluded files stay visible in a commit's file list, struck through. Individual files can be
   unticked for a single transfer.
 - On a conflict, floe stops with the markers in place and offers open-in-editor or discard.
+- **A transfer waiting in the target is not one of the page's states.** It is in the
+  repository, so the conflict and staged screens are what the target says rather than
+  something the page chose, and a reload or a restart lands back on them.
 - **Discard is offered only for a transfer floe recorded.** Floe records the transfer it
   applies outside both repositories, and it counts only while that transfer still waits in
   the target — after a restart too. Changes floe did not make are never discarded.
 - **Open in editor launches VS Code** on the target, at the conflicted file, or the system's
   default text editor where VS Code is not installed. Not `$VISUAL`: a terminal editor
-  cannot be opened from a click in the browser.
+  cannot be opened from a click in the browser. `internal/editor` finds VS Code's command
+  line tool on `PATH` or inside its macOS application bundle, and opens the repository as a
+  folder so the carried message is in the commit box.
 - **The commit list is the source's first-parent history.** A merge is one entry, diffed
   against its first parent, so a merged branch crosses as one commit.
 - **A target with no commits is supported**: its first transfer is the one that gives it a
@@ -108,8 +113,13 @@ None.
    over the line that matched, marked where the pattern hit, and `Untick this file` as the
    way out that leaves the pair's settings alone. Screens 2, 4, 5 and 6 are one shell —
    `screens/Main.svelte` — and a target column per phase. **Apply transfer** is wired: a
-   HEAD that moved is previewed again rather than applied stale. Still to come: conflict,
-   staged, the discard dialog, and pair settings with area 6.
+   HEAD that moved is previewed again rather than applied stale. Then **screen 7, the
+   conflict**, and **screen 8, staged** — which the target decides, not the page, so they
+   survive a reload and a restart — with the file rows losing their checkboxes for the tag
+   that says what each one did, the commit list pinned to the transfer, the conflicted file
+   read back out of the target's working tree, and **Open in editor** over
+   `internal/editor`; and **screen 9, the discard confirmation**, the one dialog, on a
+   native `<dialog>`. Still to come: pair settings with area 6.
 6. 🛠️ **Exclusions and content guard** — `internal/pair` reads and writes each pair's config
    and lists the remembered pairs; exclusions are matched and guard patterns compiled there.
    The guard also scans what a 3-way merge brings in. The API saves both lists and checks a

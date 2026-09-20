@@ -3,28 +3,50 @@
    * The three-column shell — source, crossing, target — left to right in the
    * direction a commit travels, and the screens that live in it: screen 2, the
    * main screen; screen 4 when the target has changes; screen 5, the preview;
-   * and screen 6, a refusal by the content guard.
+   * screen 6, a refusal by the content guard; screen 7, a transfer stopped on
+   * a conflict; and screen 8, one staged and waiting to be committed.
    *
    * Which of them is on screen is the phase below. The columns are the same
    * three throughout — only the crossing detail and the target column change,
    * and the target column is where the target's state and every action that
    * writes to it live, so each phase's is its own file beside this one.
+   *
+   * Screens 5 and 6 are where the user is, so the page holds them. Screens 7
+   * and 8 are where the *target* is: a transfer of floe's waiting in it, which
+   * outlives the page and is read back from the target itself. So they are not
+   * chosen here — they are what the target says, and a reload or a restart
+   * lands on them again.
    */
   import { Api, ApiError } from '../lib/api'
+  import { parseConflict } from '../lib/conflict'
   import { since } from '../lib/age'
   import { tilde } from '../lib/paths'
   import Arrow from '../lib/icons/Arrow.svelte'
   import Chevron from '../lib/icons/Chevron.svelte'
   import CommitList from '../lib/CommitList.svelte'
   import Conflict from '../lib/Conflict.svelte'
+  import ConflictPanel from './Conflict.svelte'
   import Diff from '../lib/Diff.svelte'
+  import Discard from '../lib/Discard.svelte'
   import FileList from '../lib/FileList.svelte'
   import GuardPanel from './GuardRefused.svelte'
   import PreviewPanel from './Preview.svelte'
+  import StagedPanel from './Staged.svelte'
   import TopBar from '../lib/TopBar.svelte'
   import Warning from '../lib/icons/Warning.svelte'
   import type { Tag } from '../lib/FileList.svelte'
-  import type { Commit, CommitDetail, File, Match, Pair, Preview, Part, Target } from '../lib/types'
+  import type {
+    Commit,
+    CommitDetail,
+    Conflict as ConflictFile,
+    File,
+    Match,
+    Pair,
+    Preview,
+    Part,
+    Target,
+    Transfer,
+  } from '../lib/types'
 
   let {
     api,
@@ -40,17 +62,22 @@
   let selected = $state('')
   let openFile = $state('')
   let diff = $state('')
+  /** The open file as it stands in the target, markers and all — screen 7. */
+  let conflict = $state<ConflictFile | undefined>(undefined)
   let skip = $state<string[]>([])
   let failure = $state('')
 
   /** Which screen the shell is showing. */
-  type Phase = 'browse' | 'preview' | 'guard'
-  let phase = $state<Phase>('browse')
+  type Phase = 'browse' | 'preview' | 'guard' | 'conflict' | 'staged'
+  /** The phases the page chooses; the target's own override them below. */
+  let stage = $state<'browse' | 'preview' | 'guard'>('browse')
   /** Screen 5: the checks that passed and what the transfer will do. */
   let preview = $state<Preview | undefined>(undefined)
   /** Screen 6: every match of the check that refused. */
   let matches = $state<Match[]>([])
-  /** A preview or an apply is running. */
+  /** Screen 9: the one confirmation, for a discard from either screen. */
+  let confirming = $state(false)
+  /** A preview, an apply, a discard or a launch is running. */
   let busy = $state(false)
 
   /** Where the target stands in the list, and whether it is an exact match. */
@@ -71,44 +98,69 @@
 
   /** A transfer of floe's waiting in the target — screens 7 and 8. */
   const waiting = $derived(target?.transfer ?? null)
+  const conflicts = $derived(target?.conflicts ?? [])
   /** The user's own changes: dirty with no transfer of floe's to explain them. */
   const theirs = $derived(target && target.dirty.length > 0 && !waiting ? target.dirty : [])
   const clean = $derived(!!target && target.dirty.length === 0)
   const canPreview = $derived(clean && crossing.length > 0 && !busy)
 
+  /*
+   * A transfer waiting in the target is not one of the page's own states: it
+   * is in the repository, and it is what the screen is about until it is
+   * committed or discarded.
+   */
+  const phase = $derived<Phase>(waiting ? (conflicts.length > 0 ? 'conflict' : 'staged') : stage)
+  const landed = $derived(phase === 'conflict' || phase === 'staged')
+
   const tags = $derived.by(() => {
     if (!waiting) return {}
-    const state = target && target.conflicts.length > 0 ? 'conflict' : 'staged'
-    return { [waiting.commit]: state }
+    return { [waiting.commit]: conflicts.length > 0 ? 'conflict' : 'staged' }
+  })
+
+  /*
+   * What crossed, and what each file did. Conflicted files come first: they
+   * are the ones still waiting on the user.
+   */
+  const crossed = $derived.by(() => {
+    if (!waiting) return []
+    return files
+      .filter((f) => !f.excluded && !waiting.skip.includes(f.path))
+      .map((f) => ({ path: f.path, conflicted: conflicts.includes(f.path) }))
+      .sort((a, b) => Number(b.conflicted) - Number(a.conflicted))
   })
 
   /*
    * What each crossing file's row says in place of its line counts: what the
-   * preview found it will do, or that the guard matched in it. In neither case
-   * does the row move — the list is still what crosses, in git's order.
+   * preview found it will do, what it did, or that the guard matched in it. In
+   * none of those cases does the row move — the list is still what crosses, in
+   * git's order.
    */
   const fileTags = $derived.by<Record<string, Tag>>(() => {
+    const out: Record<string, Tag> = {}
     if (phase === 'preview' && preview) {
-      const out: Record<string, Tag> = {}
       for (const f of preview.result.files) {
         out[f.path] = preview.result.conflicts.includes(f.path)
           ? { text: 'will conflict', role: 'warn' }
           : { text: 'merges cleanly', role: 'ok' }
       }
-      return out
-    }
-    if (phase === 'guard') {
-      const out: Record<string, Tag> = {}
+    } else if (landed) {
+      for (const f of crossed) {
+        out[f.path] = f.conflicted
+          ? { text: 'conflict', role: 'warn' }
+          : { text: 'staged', role: 'ok' }
+      }
+    } else if (phase === 'guard') {
       for (const m of matches) if (m.path) out[m.path] = { text: 'guard', role: 'bad' }
-      return out
     }
-    return {}
+    return out
   })
 
   /** The file open in the crossing column will land with markers in it. */
-  const openConflicts = $derived(
+  const openPredicted = $derived(
     phase === 'preview' && !!preview && preview.result.conflicts.includes(openFile),
   )
+  /** It already has, and the markers are on disk in the target. */
+  const openConflicted = $derived(landed && conflicts.includes(openFile))
 
   /*
    * The guard's matches in the open file, by line number, for the diff to mark.
@@ -131,7 +183,8 @@
       branch = list.branch
       commits = list.commits
       target = state
-      if (commits.length > 0) await select(firstToCross())
+      // A transfer waiting in the target picks the commit itself, below.
+      if (commits.length > 0 && !state.transfer) await select(firstToCross())
     } catch (e) {
       failure = message(e)
     }
@@ -144,11 +197,27 @@
     return commits[commits.length - 1]!.id
   }
 
-  async function select(id: string) {
+  /*
+   * A transfer waiting in the target decides what is on screen: the commit it
+   * carried, with the files it left out still unticked, and the first
+   * conflicted file open.
+   */
+  $effect(() => {
+    const w = waiting
+    if (w && selected !== w.commit) void carry(w)
+  })
+
+  async function carry(w: Transfer) {
+    await select(w.commit, conflicts[0])
+    if (selected === w.commit) skip = w.skip
+  }
+
+  async function select(id: string, prefer?: string) {
     selected = id
     detail = undefined
     openFile = ''
     diff = ''
+    conflict = undefined
     skip = []
     back()
     try {
@@ -156,7 +225,7 @@
       // A slower request for a commit since deselected must not win.
       if (selected !== id) return
       detail = d
-      const first = d.files.find((f) => !f.excluded)
+      const first = d.files.find((f) => f.path === prefer) ?? d.files.find((f) => !f.excluded)
       if (first) await show(first.path)
     } catch (e) {
       failure = message(e)
@@ -166,11 +235,21 @@
   async function show(path: string) {
     openFile = path
     diff = ''
-    // The diff is fetched even for a file the preview shows as it will land
-    // instead: it is the same request either way, and it means Back returns to
-    // a diff that is already there rather than to an empty pane.
+    conflict = undefined
     const of = selected
     try {
+      // A file left with markers is read out of the target's working tree:
+      // what is on disk there is what has to be resolved, and the commit's own
+      // diff no longer describes it.
+      if (landed && conflicts.includes(path)) {
+        const c = await api.conflict(pair.id, path)
+        if (openFile !== path || selected !== of) return
+        conflict = c
+        return
+      }
+      // The diff is fetched even for a file the preview shows as it will land
+      // instead: it is the same request either way, and it means Back returns to
+      // a diff that is already there rather than to an empty pane.
       const d = await api.diff(pair.id, of, path)
       if (openFile !== path || selected !== of) return
       diff = d.diff
@@ -185,7 +264,7 @@
 
   /** Back to screen 2, dropping a preview or a refusal that no longer holds. */
   function back() {
-    phase = 'browse'
+    stage = 'browse'
     preview = undefined
     matches = []
   }
@@ -203,7 +282,7 @@
       if (selected !== of) return
       matches = []
       preview = p
-      phase = 'preview'
+      stage = 'preview'
       // A predicted conflict is the thing to look at, so open it.
       const first = p.result.conflicts[0]
       if (first) await show(first)
@@ -214,7 +293,7 @@
         // outcome: show every match, over the file the first one is in.
         preview = undefined
         matches = e.matches
-        phase = 'guard'
+        stage = 'guard'
         // Over the file the first match is in, unless it is already open: a
         // later match's file is not the one to jump to.
         const first = matches.find((m) => m.path)
@@ -241,7 +320,10 @@
     try {
       await api.apply(pair.id, preview.id)
       back()
+      // The target now holds the transfer, and says which screen that is.
       target = await api.target(pair.id)
+      const first = (target.conflicts ?? [])[0]
+      if (first) await show(first)
     } catch (e) {
       failure = message(e)
       if (e instanceof ApiError && (e.code === 'stale' || e.code === 'preview_gone')) {
@@ -250,6 +332,52 @@
         return
       }
       back()
+      await recheck()
+    } finally {
+      busy = false
+    }
+  }
+
+  /*
+   * Screens 7 and 8. The editor is opened on the target — VS Code, where the
+   * carried message is already in the commit box — at the conflicted file, and
+   * at the marker git wrote when floe has that file's text to find it in.
+   */
+  async function openEditor() {
+    const path = conflicts.includes(openFile) ? openFile : (conflicts[0] ?? '')
+    const line =
+      conflict && conflict.path === path && !conflict.binary
+        ? (parseConflict(conflict.content).rows.find((r) => r.marker)?.no ?? 0)
+        : 0
+    busy = true
+    try {
+      await api.editor(pair.id, path, line)
+    } catch (e) {
+      failure = message(e)
+    } finally {
+      busy = false
+    }
+  }
+
+  /*
+   * Screen 9's action. Discard is `git reset --hard`, so the server offers it
+   * only for a transfer floe recorded — changes floe did not make are never
+   * discarded.
+   */
+  async function discard() {
+    busy = true
+    try {
+      await api.discard(pair.id)
+      confirming = false
+      openFile = ''
+      conflict = undefined
+      target = await api.target(pair.id)
+      // The transfer is gone, so the commit is a commit again: reopen it, this
+      // time with nothing unticked.
+      if (selected) await select(selected)
+    } catch (e) {
+      confirming = false
+      failure = message(e)
       await recheck()
     } finally {
       busy = false
@@ -270,11 +398,18 @@
   }
 
   // Floe checks the target again when its window regains focus: the user may
-  // have gone to commit or discard what is in the way.
+  // have gone to commit or discard what is in the way, or to resolve a
+  // conflict floe stopped on.
   $effect(() => {
     const onfocus = () => void recheck()
     window.addEventListener('focus', onfocus)
     return () => window.removeEventListener('focus', onfocus)
+  })
+
+  // A conflict resolved in the editor stops being one, and the file the
+  // crossing column is showing goes back to being the commit's own diff.
+  $effect(() => {
+    if (landed && openFile && conflict && !conflicts.includes(openFile)) void show(openFile)
   })
 
   function message(e: unknown): string {
@@ -320,6 +455,7 @@
         nearest={isNearest}
         targetName={pair.target.name}
         {tags}
+        locked={landed}
         onselect={select}
       />
     </section>
@@ -328,7 +464,7 @@
     <section class="column crossing">
       {#if commit}
         <div class="head wide">
-          <span class="eyebrow">Crossing{phase === 'preview' ? ' · preview' : ''}</span>
+          <span class="eyebrow">Crossing{eyebrow(phase)}</span>
           <span class="subject">{commit.subject}</span>
           <span class="by">
             <span class="mono">{commit.id.slice(0, 7)}</span>
@@ -346,13 +482,16 @@
             {skip}
             tags={fileTags}
             locked={phase === 'preview'}
+            applied={landed}
             onselect={show}
             onskip={setSkip}
           />
           {#if openMeta}
             <div class="openbar">
               <span class="mono name">{openMeta.path}</span>
-              {#if openConflicts}
+              {#if openConflicted}
+                <span class="muted">in {pair.target.name}’s working tree</span>
+              {:else if openPredicted}
                 <span class="muted">what lands in {pair.target.name}</span>
               {:else if !openMeta.binary}
                 <span class="mono added">+{openMeta.added}</span>
@@ -360,7 +499,22 @@
               {/if}
             </div>
             <div class="diffpane">
-              {#if openConflicts}
+              {#if openConflicted}
+                <!-- The file as git wrote it, out of the target's working tree. -->
+                {#if !conflict}
+                  <p class="aside">Reading {openMeta.path} from {pair.target.name}…</p>
+                {:else if conflict.binary}
+                  <p class="aside">
+                    {openMeta.path} is binary, so there are no lines to show. Resolve it in your editor.
+                  </p>
+                {:else}
+                  <Conflict
+                    text={conflict.content}
+                    targetName={pair.target.name}
+                    commit={selected}
+                  />
+                {/if}
+              {:else if openPredicted}
                 <!-- The file as git will write it, markers and all. -->
                 <Conflict
                   text={preview?.result.conflicted?.[openMeta.path] ?? ''}
@@ -396,7 +550,24 @@
         </span>
       </div>
 
-      {#if phase === 'preview' && preview}
+      {#if phase === 'conflict'}
+        <ConflictPanel
+          files={crossed}
+          targetName={pair.target.name}
+          {busy}
+          onopen={openEditor}
+          ondiscard={() => (confirming = true)}
+        />
+      {:else if phase === 'staged'}
+        <StagedPanel
+          count={crossed.length}
+          message={target?.message ?? ''}
+          targetName={pair.target.name}
+          {busy}
+          onopen={openEditor}
+          ondiscard={() => (confirming = true)}
+        />
+      {:else if phase === 'preview' && preview}
         <PreviewPanel
           {preview}
           targetName={pair.target.name}
@@ -471,13 +642,6 @@
                 Untracked files don't count.
               </span>
             </div>
-          {:else if waiting}
-            <div class="blocked">
-              <span class="line ok-text">A transfer of floe's is waiting in {pair.target.name}.</span>
-              <span class="muted">
-                The staged and conflict screens are the next pass of area 5.
-              </span>
-            </div>
           {/if}
         {/if}
 
@@ -487,7 +651,7 @@
           <span class="muted says">
             {#if !target}
               Reading {pair.target.name}…
-            {:else if theirs.length > 0 || waiting}
+            {:else if theirs.length > 0}
               Nothing will be transferred while {pair.target.name} has changes.
             {:else if !detail}
               Reading the commit…
@@ -517,11 +681,31 @@
   </div>
 </div>
 
+<!-- Screen 9: one confirmation, since discarding is one operation. -->
+<Discard
+  open={confirming}
+  targetName={pair.target.name}
+  branch={target?.branch ?? ''}
+  head={target?.head ?? ''}
+  {busy}
+  onkeep={() => (confirming = false)}
+  ondiscard={discard}
+/>
+
 <script lang="ts" module>
   /** A commit message past its subject line. */
   function body(message: string): string {
     const cut = message.indexOf('\n')
     return cut < 0 ? '' : message.slice(cut + 1).trim()
+  }
+
+  /*
+   * What the crossing column's eyebrow says the commit is doing. A guard
+   * refusal leaves it alone: nothing happened to the commit, which is the
+   * whole point of that screen.
+   */
+  function eyebrow(phase: string): string {
+    return phase === 'preview' || phase === 'conflict' || phase === 'staged' ? ` · ${phase}` : ''
   }
 </script>
 
@@ -661,6 +845,7 @@
     margin: 0;
     padding: 14px 20px;
     color: var(--text-faint);
+    line-height: 19px;
   }
 
   .facts {
@@ -696,10 +881,6 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    color: var(--accent);
-  }
-
-  .ok-text {
     color: var(--accent);
   }
 

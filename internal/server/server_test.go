@@ -398,6 +398,17 @@ func TestConflictThroughTheAPI(t *testing.T) {
 	h.call("GET", api+"/conflict?path=new.txt", nil, http.StatusNotFound, nil)
 	h.call("GET", api+"/conflict?path=../../etc/passwd", nil, http.StatusNotFound, nil)
 
+	// Open in editor takes only a path git reports in the target: joining one
+	// onto the repository cleans away "..", so the set git reports is the
+	// boundary. What it launches is not something a test can assert on, so the
+	// launch itself is left to internal/editor's own tests.
+	var refusedPath errorResponse
+	h.call("POST", api+"/editor", editorRequest{Path: "../../etc/passwd"}, http.StatusNotFound, &refusedPath)
+	if refusedPath.Error.Code != "not_changed" {
+		t.Errorf("editor on a path outside the target = %+v", refusedPath.Error)
+	}
+	h.call("POST", api+"/editor", editorRequest{Path: "untouched.txt"}, http.StatusNotFound, nil)
+
 	var target targetJSON
 	h.call("GET", api+"/target", nil, http.StatusOK, &target)
 	if target.Transfer == nil || !slices.Equal(target.Conflicts, []string{"f.txt"}) || summarize(target.Dirty) != "U f.txt, A new.txt" {

@@ -17,6 +17,7 @@
     skip,
     tags = {},
     locked = false,
+    applied = false,
     onselect,
     onskip,
   }: {
@@ -32,6 +33,12 @@
      * off: unticking the file the guard matched in is the way out of it.
      */
     locked?: boolean
+    /*
+     * The transfer has happened. There is nothing left to tick, so the rows
+     * lose their checkboxes and the count reads in the past: what each file
+     * did is its tag.
+     */
+    applied?: boolean
     onselect: (path: string) => void
     onskip: (path: string, crossing: boolean) => void
   } = $props()
@@ -49,32 +56,37 @@
 </script>
 
 <div class="files">
-  <div class="eyebrow count">Files · {crossing} of {files.length} cross</div>
+  <div class="eyebrow count">
+    Files · {crossing} of {files.length}
+    {applied ? 'crossed' : 'cross'}
+  </div>
   {#each ordered as f (f.path)}
     {@const ticked = !f.excluded && !skip.includes(f.path)}
     <div class="row" class:selected={f.path === selected} class:out={!ticked}>
-      <button
-        class="tick"
-        type="button"
-        disabled={f.excluded || locked}
-        aria-label={f.excluded
-          ? `${f.path} never crosses`
-          : `${ticked ? 'Do not transfer' : 'Transfer'} ${f.path}`}
-        aria-pressed={ticked}
-        onclick={() => onskip(f.path, !ticked)}
-      >
-        {#if ticked}
-          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-            <rect x="0.75" y="0.75" width="12.5" height="12.5" rx="2" fill="#6fc2b4" stroke="#6fc2b4" />
-            <path d="M3.5 7.2l2.3 2.3 4.7-4.9" fill="none" stroke="#15171b" stroke-width="1.6" />
-          </svg>
-        {:else}
-          <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
-            <rect x="0.75" y="0.75" width="12.5" height="12.5" rx="2" fill="none" stroke="#3a3f47" />
-            <path d="M4 7h6" stroke="#4a5059" stroke-width="1.5" />
-          </svg>
-        {/if}
-      </button>
+      {#if !applied}
+        <button
+          class="tick"
+          type="button"
+          disabled={f.excluded || locked}
+          aria-label={f.excluded
+            ? `${f.path} never crosses`
+            : `${ticked ? 'Do not transfer' : 'Transfer'} ${f.path}`}
+          aria-pressed={ticked}
+          onclick={() => onskip(f.path, !ticked)}
+        >
+          {#if ticked}
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <rect x="0.75" y="0.75" width="12.5" height="12.5" rx="2" fill="#6fc2b4" stroke="#6fc2b4" />
+              <path d="M3.5 7.2l2.3 2.3 4.7-4.9" fill="none" stroke="#15171b" stroke-width="1.6" />
+            </svg>
+          {:else}
+            <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
+              <rect x="0.75" y="0.75" width="12.5" height="12.5" rx="2" fill="none" stroke="#3a3f47" />
+              <path d="M4 7h6" stroke="#4a5059" stroke-width="1.5" />
+            </svg>
+          {/if}
+        </button>
+      {/if}
 
       <button class="open" type="button" onclick={() => onselect(f.path)}>
         <span class="mono status {statusRole(f.status)}">{f.status}</span>

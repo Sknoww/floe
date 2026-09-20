@@ -71,7 +71,10 @@ border on a callout.
 - Columns at 1440 wide: **source 340px · crossing flexible · target 300px**, which leaves
   the diff about 800px.
 - Each column opens with a head: eyebrow (`Source`, `Crossing`, `Target`), the name, and
-  the path and branch in mono. The crossing head adds the id, author, age and message.
+  the path and branch in mono. The crossing head adds the id, author, age and message. Its
+  eyebrow says what the commit is doing when that is not simply crossing:
+  `Crossing · preview`, `· conflict`, `· staged`. A guard refusal leaves it alone — nothing
+  happened to the commit, which is the point of that screen.
 - The target panel's actions sit at its bottom edge, under the sentence that says what
   they will do.
 - Rows: commits 40px, files 30px, diff lines 20px.
@@ -88,17 +91,21 @@ border on a callout.
   - A subject too long for the column ends in an ellipsis; its full text is in the
     crossing head.
   - While a transfer is in progress, a tag (`staged`, `conflict`) replaces the age on its
-    commit.
+    commit, its dot takes the tag's colour, and no other commit can be selected: that
+    transfer is what the screen is about until it is committed or discarded.
 - **File row**: checkbox, status letter (`M` amber, `A` green, `D` red), path, then line
   counts or a result tag.
   - An excluded file is struck through, dimmed, labelled `excluded`, and its checkbox
     shows a dash. It stays in the list, at the bottom of it: the list reads as what
     crosses, with what never does beneath. Within each group the order is git's. A file
     unticked for one transfer dims where it is and does not move.
-  - After apply there are no checkboxes: the row's tag says what happened.
+  - After apply there are no checkboxes: the row's tag says what happened, and the count
+    above the list reads in the past (`Files · 3 of 5 crossed`).
 - **Diff**: two gutters, old and new line numbers, 48px each, then the line. Hunk
   headers in their own colour. Our own component, never a library.
-- **Conflict view**: the file as git writes it. Marker lines amber on an amber tint; the
+- **Conflict view**: the file as git writes it — from the preview before an apply, and out
+  of the target's working tree after one, which the bar above it says
+  (`in app-public's working tree`). Marker lines amber on an amber tint; the
   `ours` block tinted blue-grey and labelled with the target (`app-public's line`), the
   `theirs` block tinted teal and labelled with the commit (`from 5b2d8f3`).
 - **Guard match**: the pattern in mono, where it matched (file and line, or the commit

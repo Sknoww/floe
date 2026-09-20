@@ -172,8 +172,25 @@ Code's commit box picks up the carried `SQUASH_MSG` and it has conflict tooling.
 Code is not installed, the file opens in the system's default text editor. On macOS the
 `code` command is often not on `PATH` even with VS Code installed, so floe must find the
 application itself rather than rely on it. `$VISUAL` is not used: floe is driven from a
-browser, and a terminal editor has no terminal to open in. The exact launch commands are
-probed and written here when area 5 builds it.
+browser, and a terminal editor has no terminal to open in.
+
+`internal/editor` is where the launch lives. VS Code's command line tool is looked for on
+`PATH` (`code`, then `code-insiders`), and then — on macOS — inside the application bundles,
+at `Contents/Resources/app/bin/code`: the same shell script a `PATH` installation points at,
+and one that hands its arguments to an instance already running.
+`open -b com.microsoft.VSCode --args …` is not used, because an application already running
+never sees those arguments.
+
+```
+code <target> -g <target>/<path>:<line>
+```
+
+The repository is opened as a folder, so the commit box that carries `SQUASH_MSG` is there,
+and `-g` puts the cursor on the conflict's first marker line — the page has the file's text
+and so the number. Where VS Code is not installed the file opens in the system's default text
+editor instead: `open -t <file>` on macOS, `xdg-open <file>` on Linux. With no file to name
+it is the repository that opens (`open <dir>`, without `-t`: a directory has no default text
+editor). Neither launch is waited on — an editor outlives the request that opened it.
 
 **Abort** is `git reset --hard HEAD` plus removing `SQUASH_MSG`. It is safe only because the
 target was clean before the transfer — and it also discards any resolution edits made since,
@@ -246,6 +263,7 @@ applies at once; the repositories are opened once a launch.
 | `POST /api/pairs/{pair}/preview` | Runs every check and the preview, and keeps the preview under an id |
 | `POST /api/pairs/{pair}/apply` | Applies the preview it names |
 | `POST /api/pairs/{pair}/discard` | Discards the transfer of floe's waiting in the target |
+| `POST /api/pairs/{pair}/editor` | Opens the target in the editor, at `path` and `line`. Only a path git reports there — changed or unmerged — is opened: joining a path onto the repository cleans `..` away, so the set git reports is the boundary rather than the join |
 
 - **A refusal is `{"error": {"code", "message"}}`**, the message in floe's or git's own words:
   `dirty` (with `paths`), `guard` (with `matches`), `apply_refused` (git's stderr), `stale`,
@@ -290,7 +308,7 @@ release build has no such origin and an OS-chosen port.
 | Area | Decision |
 |---|---|
 | Language | Go, one binary. Module `github.com/Sknoww/floe`, binary `floe`. The `go.mod` floor tracks the minimum the code needs, never bumped just because a newer toolchain is installed |
-| Layout | `main.go` at the root. `internal/git` shells out and parses; `internal/pair` owns pair config and remembered pairs; `internal/transfer` orders the checks, import, preview, apply and position computation; `internal/server` is HTTP, the token and the JSON API; `internal/gittest` makes the throwaway repositories the tests run against. `web/` is the frontend: `src/lib` is what every screen shares (the typed API client, the session, small helpers, icons), `src/screens` is one file per screen in `DESIGN.md`, and `src/app.css` holds the foundations — nothing else declares a colour or a size. Screens 2, 4, 5 and 6 are the same three-column shell, so `screens/Main.svelte` owns it and the phase it is in, and each of the others is the target column that phase puts in it: the column holding the target's state and every action that writes to it is the whole of what they change |
+| Layout | `main.go` at the root. `internal/git` shells out and parses; `internal/pair` owns pair config and remembered pairs; `internal/transfer` orders the checks, import, preview, apply and position computation; `internal/editor` is the one launch floe makes that is not git; `internal/server` is HTTP, the token and the JSON API; `internal/gittest` makes the throwaway repositories the tests run against. `web/` is the frontend: `src/lib` is what every screen shares (the typed API client, the session, small helpers, icons), `src/screens` is one file per screen in `DESIGN.md`, and `src/app.css` holds the foundations — nothing else declares a colour or a size. Screens 2, 4, 5 and 6 are the same three-column shell, so `screens/Main.svelte` owns it and the phase it is in, and each of the others is the target column that phase puts in it: the column holding the target's state and every action that writes to it is the whole of what they change |
 | Frontend | **Svelte 5 + TypeScript, built with Vite.** Not SvelteKit: the Go server owns routing and the API, and the UI is one embedded page. Node is a build-time dependency only; binary size is not a constraint. There is no router: one pair is open at a time, and which one lives in the URL fragment beside the token, so a reload lands back on it. TypeScript is held at 6.x, which is the newest `svelte-check` declares |
 | Styling | Plain CSS with custom properties, scoped per component; the values come from `DESIGN.md`. No component library — the mockups decide the look. The design's one dialog (the discard confirmation) and one menu (the pair switcher) are **hand-rolled, with no primitives library**: a native `<dialog>` opened with `showModal()` already gives the focus trap, Esc and `::backdrop`, and one menu does not earn a dependency |
 | Diff rendering | Our own component over git's unified output, so it follows `DESIGN.md`. Binary files render as a named placeholder. Syntax highlighting is deferred; Shiki is the candidate |
