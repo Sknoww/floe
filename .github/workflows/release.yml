@@ -1,0 +1,59 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # GoReleaser builds the changelog from history, so a shallow
+          # clone would leave it empty.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      # GoReleaser runs the frontend build in its before hooks but does not
+      # install Node itself.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # GoReleaser publishes the release before it pushes the cask, so a
+      # missing token fails *after* the release exists — leaving the tag
+      # burned and the tap stale. Check it while nothing has been published.
+      - name: Check tap token
+        run: |
+          if [ -z "${{ secrets.HOMEBREW_TAP_TOKEN }}" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN is not set. The cask push to Sknoww/homebrew-tap needs it."
+            echo "Set it with: gh secret set HOMEBREW_TAP_TOKEN --repo Sknoww/floe"
+            exit 1
+          fi
+
+      # A tag is the point of no return: once the release is published the
+      # cask points at it. Fail here instead of shipping a broken build.
+      - name: Test frontend
+        run: npm ci && npm test
+        working-directory: web
+
+      - name: Test
+        run: go test ./...
+
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          distribution: goreleaser
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}

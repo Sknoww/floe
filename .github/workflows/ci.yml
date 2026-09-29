@@ -1,0 +1,50 @@
+name: ci
+
+# The release workflow's test step guards the *tag*, which is a different
+# claim from "this commit is good" — and a tag is the one thing that cannot
+# be taken back. This runs the same checks at every push and PR instead, so a
+# break is found on the commit that introduced it rather than on the commit
+# that publishes it.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend
+        run: npm ci
+        working-directory: web
+
+      - name: Test frontend
+        run: npm test
+        working-directory: web
+
+      # Built before the Go suite, so the server tests run against the page
+      # the binary will embed rather than the placeholder.
+      - name: Build frontend
+        run: npm run build
+        working-directory: web
+
+      # The suite is hermetic — TestMain pins GIT_CONFIG_NOSYSTEM in every
+      # package that shells out to git — so this asks the same question a
+      # local `go test ./...` does.
+      - name: Test
+        run: go test ./...

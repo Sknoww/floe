@@ -130,6 +130,12 @@ None.
    pattern as it is typed, with floe's suggested fix, and screen 3 is that screen. What is
    left is **"never transfer" on a file row** — a shortcut for what screen 3 already does
    the long way, and undrawn: it needs a design decision before it is built.
-7. ⏳ **Release** — GoReleaser, the cask, `README.md`.
+7. 🛠️ **Release** — `.goreleaser.yaml` builds the frontend in its before hooks, then
+   darwin/linux × amd64/arm64 with `main.version` stamped, and a cask for
+   `Sknoww/homebrew-tap` that strips quarantine. `ci.yml` runs the frontend tests and build
+   and the Go suite on every push; `release.yml` does the same on a `v*` tag, after checking
+   the tap token, before GoReleaser publishes. `README.md` and an MIT `LICENSE`. A local
+   `goreleaser release --snapshot --clean` passes. What is left: the repository made public,
+   `HOMEBREW_TAP_TOKEN` set on it, green CI, and the first tag.
 8. ⏸️ **Whole-tree comparison** — source HEAD against the target, beyond the per-commit
    nearest match.

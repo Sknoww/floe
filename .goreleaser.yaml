@@ -1,0 +1,74 @@
+# Release automation: one `git push --tags` builds the frontend and every
+# binary, cuts the GitHub release, and updates the Homebrew cask in
+# Sknoww/homebrew-tap.
+#
+# Run `goreleaser release --snapshot --clean` to exercise the whole pipeline
+# locally without publishing anything.
+version: 2
+
+project_name: floe
+
+before:
+  hooks:
+    - go mod tidy
+    # The binary embeds web/dist, so the page is built before any binary.
+    # `--prefix` rather than a hook `dir:`, which is a GoReleaser Pro option.
+    # The Vite build writes web/dist, not the root dist/ GoReleaser owns.
+    - npm --prefix web ci
+    - npm --prefix web run build
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    # A release build is untagged: the `dev` tag's Vite origin and fixed port
+    # never ship.
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+
+homebrew_casks:
+  - name: floe
+    repository:
+      owner: Sknoww
+      name: homebrew-tap
+      # The workflow's default GITHUB_TOKEN is scoped to this repo only, so
+      # pushing the cask to the tap needs a token that can write there.
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Casks
+    homepage: "https://github.com/Sknoww/floe"
+    description: "Carry commits between git repositories that share no history"
+    commit_msg_template: "floe {{ .Version }}"
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr",
+                           args: ["-dr", "com.apple.quarantine", "#{staged_path}/floe"]
+          end
+    # No `zap` stanza, as in drift: `~/.config/floe/` would be the honest
+    # target, but GoReleaser renders the array in a shape `brew style` rejects.
+    # Floe writes nothing inside either repository that a zap could reach.
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^Roadmap:"
+      - "^docs:"
+      - "^test:"
+
+release:
+  footer: |
+    ## Install
+
+    ```sh
+    brew install Sknoww/tap/floe
+    ```
